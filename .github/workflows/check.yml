@@ -1,0 +1,25 @@
+# Checks every pull request and every push to main. Runs with a read-only token and no secrets,
+# so a pull request from a fork is safe to check.
+name: Check
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: 22
+      - name: Manifests, skills, agents, changelog and email addresses
+        run: node scripts/check-plugin.mjs
+      - name: Factory script tests
+        working-directory: skills/setup/factory
+        run: node --test "scripts/factory/*.test.mjs"
