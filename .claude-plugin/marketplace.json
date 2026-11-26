@@ -1,0 +1,17 @@
+{
+  "name": "sstack",
+  "owner": {
+    "name": "sambulosenda",
+    "url": "https://github.com/sambulosenda"
+  },
+  "description": "sstack: a software factory for Expo apps, as an installable Claude Code plugin.",
+  "plugins": [
+    {
+      "name": "sstack",
+      "source": "./",
+      "description": "Agents turn GitHub issues into tested Expo changes. Scripts block, agents advise, a person decides.",
+      "category": "engineering",
+      "keywords": ["expo", "react-native", "software-factory", "agents", "qa"]
+    }
+  ]
+}

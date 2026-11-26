@@ -1,0 +1,44 @@
+# Expo Workflows does not start on issue events, so this Action forwards the issue number
+# when a person adds a label:
+#   "agent" -> Issue to PR: a coding agent writes the change and opens a pull request.
+#   "bug"   -> Bug triage: an agent tries to reproduce the report on a simulator.
+# Based on Expo's guide: https://docs.expo.dev/agentic-workflows/issue-to-pr/
+#
+# Needs a repository secret EXPO_TOKEN (a token of the robot user): gh secret set EXPO_TOKEN
+# If you use Bun, pnpm or Yarn, replace the "npm ci" steps.
+
+name: Start the agent
+
+on:
+  issues:
+    types: [labeled]
+
+permissions:
+  contents: read
+
+jobs:
+  issue_to_pr:
+    if: github.event.label.name == 'agent'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: 22
+      - run: npm ci
+      - run: npx --yes eas-cli@27.10.0 workflow:run .eas/workflows/issue-to-pr.yml --ref ${{ github.sha }} -F issue_number=${{ github.event.issue.number }} --non-interactive
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}
+
+  bug_triage:
+    if: github.event.label.name == 'bug'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
+        with:
+          node-version: 22
+      - run: npm ci
+      - run: npx --yes eas-cli@27.10.0 workflow:run .eas/workflows/bug-triage.yml --ref ${{ github.sha }} -F issue_number=${{ github.event.issue.number }} --non-interactive
+        env:
+          EXPO_TOKEN: ${{ secrets.EXPO_TOKEN }}

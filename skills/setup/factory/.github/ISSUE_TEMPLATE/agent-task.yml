@@ -1,0 +1,60 @@
+name: Agent task
+description: One small, testable change for the coding agent.
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Write this for a reader with no context. The agent follows the text of this issue literally,
+        and agent QA tests what the resulting pull request says a user can see.
+        A person adds the `agent` label after reading the issue. It is not added automatically.
+  - type: textarea
+    id: change
+    attributes:
+      label: What should change
+      description: One change. Name the screen and where on it.
+      placeholder: On the home screen, add a Reset button next to the counter.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: What a user sees or can do when this is done. Each line must be checkable in the running app.
+      placeholder: |
+        - A "Reset" button is visible next to the counter.
+        - Tapping it sets the count to 0.
+        - The count stays 0 after the app is closed and opened again.
+    validations:
+      required: true
+  - type: textarea
+    id: covered-by-tests
+    attributes:
+      label: Covered by tests
+      description: |
+        Behaviour that is part of "done" but cannot be seen by tapping through the app on a simulator:
+        a saved value the app cannot create, a new calendar day, what a screen reader says. The agent
+        writes a test for each line, the reviewer checks it is there, and QA leaves these out of its verdict.
+        Leave empty when every criterion above can be checked in the app.
+      placeholder: |
+        - A saved value the app does not know falls back to the default.
+  - type: textarea
+    id: out-of-scope
+    attributes:
+      label: Out of scope
+      description: What the agent must leave alone.
+      placeholder: Do not change the counter's styling or the settings screen.
+  - type: textarea
+    id: pointers
+    attributes:
+      label: Pointers
+      description: Files, components or designs that help. Optional.
+      placeholder: src/features/counter/CounterScreen.tsx
+  - type: checkboxes
+    id: guardrails
+    attributes:
+      label: Sensitive areas
+      description: Tick only if this issue explicitly asks for a change there. Unticked means the agent must not touch it.
+      options:
+        - label: Purchases, entitlements, product IDs or prices
+        - label: Authentication or account deletion
+        - label: A new dependency

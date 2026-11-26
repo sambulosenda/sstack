@@ -1,0 +1,29 @@
+{
+  "name": "sstack",
+  "version": "0.1.0",
+  "description": "A software factory for Expo apps: agents turn issues into tested changes, checked by scripts, Maestro flows, a QA agent on a simulator and a fresh code reviewer, with a person deciding every merge and release.",
+  "author": {
+    "name": "sambulosenda",
+    "url": "https://github.com/sambulosenda"
+  },
+  "homepage": "https://github.com/sambulosenda/sstack",
+  "repository": "https://github.com/sambulosenda/sstack",
+  "license": "MIT",
+  "keywords": [
+    "expo",
+    "react-native",
+    "software-factory",
+    "agents",
+    "qa",
+    "maestro",
+    "eas"
+  ],
+  "skills": [
+    "./skills/setup",
+    "./skills/factory-run",
+    "./skills/prd-to-issues",
+    "./skills/add-screen",
+    "./skills/add-analytics-event",
+    "./skills/fix-maestro-flow"
+  ]
+}

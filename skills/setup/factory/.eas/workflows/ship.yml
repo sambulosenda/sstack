@@ -1,0 +1,79 @@
+# Ship main: runs on every merge to main.
+#
+# - Native code unchanged (a production build with the same fingerprint exists):
+#   publish an over-the-air update to 25% of users, then wait for a person to approve 100%.
+# - Native code changed: make a production build, then wait for a person to approve
+#   the store submission.
+#
+# Nothing reaches all users, and nothing reaches the store, without a person approving it.
+#
+# Needs Expo Update configured (npx eas-cli@27.10.0 update:configure) and store
+# credentials for submit (https://docs.expo.dev/submit/ios/).
+# To add Android, copy the get_build / build / submit jobs with platform: android.
+
+name: Ship main
+
+on:
+  push:
+    branches: ['main']
+
+jobs:
+  fingerprint:
+    type: fingerprint
+    environment: production
+
+  get_build:
+    name: Find a production build with the same native code
+    type: get-build
+    needs: [fingerprint]
+    params:
+      platform: ios
+      profile: production
+      fingerprint_hash: ${{ needs.fingerprint.outputs.ios_fingerprint_hash }}
+
+  # Path A: JavaScript-only change -> over-the-air update.
+  ota:
+    name: Publish update to 25% of users
+    type: update
+    needs: [get_build]
+    if: ${{ needs.get_build.outputs.build_id }}
+    environment: production
+    params:
+      channel: production
+      rollout_percentage: 25
+
+  approve_rollout:
+    name: Roll out to all users?
+    type: require-approval
+    needs: [ota]
+
+  complete_rollout:
+    name: Roll out to all users
+    type: update-rollout
+    needs: [ota, approve_rollout]
+    params:
+      update_group_id: ${{ needs.ota.outputs.first_update_group_id }}
+      rollout_percentage: 100
+
+  # Path B: native change -> new store build.
+  build:
+    name: Build for the App Store
+    type: build
+    needs: [get_build]
+    if: ${{ !needs.get_build.outputs.build_id }}
+    params:
+      platform: ios
+      profile: production
+
+  approve_submit:
+    name: Submit to the App Store?
+    type: require-approval
+    needs: [build]
+
+  submit:
+    name: Submit to the App Store
+    type: submit
+    needs: [build, approve_submit]
+    params:
+      build_id: ${{ needs.build.outputs.build_id }}
+      profile: production

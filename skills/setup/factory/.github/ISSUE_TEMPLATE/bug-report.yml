@@ -1,0 +1,39 @@
+name: Bug report
+description: Something in the app is wrong. An agent will try to reproduce it on a simulator.
+labels: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Write the steps so that someone who has never seen the app can follow them from a fresh install.
+        A person adds the `bug` label after reading the report. That starts the reproduction.
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps
+      description: From a fresh install. One action per line.
+      placeholder: |
+        1. Finish onboarding.
+        2. Tap Add one three times.
+        3. Tap Reset.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected result
+      placeholder: The count shows 0.
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual result
+      placeholder: The count still shows 3.
+    validations:
+      required: true
+  - type: input
+    id: where
+    attributes:
+      label: Device and app version
+      placeholder: iPhone 16, iOS 26.1, app 1.2.0

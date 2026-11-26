@@ -1,0 +1,270 @@
+# PR checks: scripted gates first, then an agent tests the change on a remote iOS Simulator.
+# If a scripted check fails on a pull request that the agent opened, the failure goes back to
+# the coding agent for a fix, up to two times. Then a person is asked to look.
+# The agent's QA verdict is advisory until you make it blocking (see the result job).
+#
+# One workflow, one build. The fingerprint -> get-build -> build | repack chain reuses an
+# existing simulator build when the native code did not change, so most PRs skip the slow
+# native build.
+#
+# The check, comment and result jobs follow Expo's Agentic CI guide:
+# https://docs.expo.dev/agentic-workflows/agentic-ci/
+#
+# EDIT: set MAESTRO_APP_ID to your iOS bundle identifier.
+
+name: PR checks
+
+on:
+  pull_request:
+    branches: ['main']
+    types: ['opened', 'reopened', 'synchronize', 'ready_for_review']
+    if: ${{ !github.event.pull_request.draft }}
+
+# A new commit on a pull request cancels the run for the old commit.
+concurrency:
+  group: pr-checks-${{ github.event.pull_request.number }}
+  cancel_in_progress: true
+
+jobs:
+  # 1. Cheap, deterministic gates. Nothing else spends money until these pass.
+  static:
+    name: Typecheck, lint, unit tests
+    environment: preview
+    env:
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+      BRANCH: ${{ github.event.pull_request.head.ref }}
+    steps:
+      - uses: eas/checkout
+      - uses: eas/install_node_modules
+      - name: Label the pull request with its risk (advice, never fails)
+        run: node scripts/factory/risk.mjs || true
+      - name: Agent pull requests do not weaken tests or checks
+        run: node scripts/factory/check-guardrails.mjs
+      - name: Typecheck
+        run: npx tsc --noEmit
+      - name: Lint
+        run: npx expo lint
+      - name: Maestro flows only use testIDs that exist
+        run: node scripts/factory/check-testids.mjs
+      - name: Unit tests
+        run: npx jest --ci
+      - name: Factory script tests
+        run: node --test "scripts/factory/*.test.mjs"
+
+  # 1b. An agent reviews the diff and posts its findings. Advice only: it never fails the run.
+  # It needs no build, so it runs beside the build. Delete this job to switch the review off.
+  review:
+    name: Agent code review
+    needs: [static]
+    environment: preview
+    env:
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+      BRANCH: ${{ github.event.pull_request.head.ref }}
+      HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      PR_TITLE: ${{ github.event.pull_request.title }}
+      PR_BODY: ${{ github.event.pull_request.body || 'The pull request has no description.' }}
+    steps:
+      - uses: eas/checkout
+      - uses: eas/install_node_modules
+      - name: Review the diff
+        run: bash .eas/agents/review.sh || true
+      - uses: eas/upload_artifact
+        if: ${{ always() }}
+        with:
+          type: other
+          name: agent-review
+          path: agent-output/evidence/review.md
+
+  # 2. Find a simulator build with the same native code, or make one.
+  fingerprint:
+    type: fingerprint
+    environment: preview
+
+  get_build:
+    type: get-build
+    needs: [fingerprint]
+    params:
+      platform: ios
+      profile: preview
+      simulator: true
+      fingerprint_hash: ${{ needs.fingerprint.outputs.ios_fingerprint_hash }}
+      wait_for_in_progress: true
+
+  build:
+    type: build
+    needs: [get_build]
+    if: ${{ !needs.get_build.outputs.build_id }}
+    params:
+      platform: ios
+      profile: preview
+
+  repack:
+    type: repack
+    needs: [get_build]
+    if: ${{ needs.get_build.outputs.build_id }}
+    params:
+      build_id: ${{ needs.get_build.outputs.build_id }}
+      profile: preview
+
+  # 3. Scripted end-to-end flows. These are the regression net.
+  e2e:
+    name: Maestro flows
+    type: maestro
+    needs: [static, get_build]
+    after: [build, repack]
+    environment: preview
+    env:
+      MAESTRO_APP_ID: com.yourcompany.yourapp
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+      HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+    params:
+      build_id: ${{ after.build.outputs.build_id || after.repack.outputs.build_id }}
+      flow_path: ['.maestro']
+      retries: 1
+      record_screen: true
+    hooks:
+      after_maestro_tests:
+        - name: Post failed flows on the pull request
+          if: ${{ always() }}
+          run: node .eas/agents/maestro-report.mjs "${MAESTRO_TESTS_DIR:-}" || true
+
+  # 4. An agent tests what the PR description says, on a remote simulator.
+  check:
+    name: Agent QA
+    needs: [e2e]
+    after: [build, repack]
+    environment: preview
+    env:
+      BUILD_ID: ${{ after.build.outputs.build_id || after.repack.outputs.build_id }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+      BRANCH: ${{ github.event.pull_request.head.ref }}
+      HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      PR_TITLE: ${{ github.event.pull_request.title }}
+      PR_BODY: ${{ github.event.pull_request.body || 'The pull request has no description.' }}
+    outputs:
+      verdict: ${{ steps.check.outputs.verdict }}
+      session_url: ${{ steps.check.outputs.session_url }}
+      build_id: ${{ steps.check.outputs.build_id }}
+      commit: ${{ steps.check.outputs.commit }}
+    steps:
+      - uses: eas/checkout
+      - uses: eas/install_node_modules
+      - id: check
+        name: Test the pull request on a remote iOS Simulator
+        run: |
+          set -euo pipefail
+          source .eas/agents/start-session.sh ios "$BUILD_ID" "PR check" agentic-ci
+
+          # On an agent pull request (branch agent/issue-<n>), QA also gets the issue, so it
+          # tests the acceptance criteria and not only what the coding agent says it did.
+          ISSUE_NUMBER=''
+          case "$BRANCH" in agent/issue-*) ISSUE_NUMBER=${BRANCH#agent/issue-} ;; esac
+          case "$ISSUE_NUMBER" in *[!0-9]*) ISSUE_NUMBER='' ;; esac
+          ISSUE=''
+          if [ -n "$ISSUE_NUMBER" ] && [ -n "${GITHUB_TOKEN:-}" ]; then
+            ISSUE=$(node .eas/agents/github.mjs issue "$ISSUE_NUMBER" 2> /dev/null || true)
+          fi
+
+          {
+            cat .eas/agents/check-pr.md
+            printf '\n## Pull request\n\n%s\n\n%s\n\n' "$PR_TITLE" "$PR_BODY"
+            if [ -n "$ISSUE" ]; then
+              printf '## Issue #%s\n\n%s\n\n' "$ISSUE_NUMBER" "$ISSUE"
+            fi
+            cat agent-output/device.md
+          } > agent-output/prompt.md
+
+          # The agent can write files. Keep the script that later runs with the token out of
+          # its reach (see clones.sh).
+          source .eas/agents/clones.sh
+          HELPER=$(trusted_copy .eas/agents/github.mjs)
+
+          env -u EXPO_TOKEN -u EXPO_TOKEN_SIMULATOR -u GITHUB_TOKEN \
+            timeout 20m bash .eas/agents/run-agent.sh agent-output/prompt.md device || true
+
+          VERDICT_FILE=$(agent_file agent-output/evidence/verdict.md)
+          VERDICT=$(head -n 1 "$VERDICT_FILE")
+          VERDICT=${VERDICT:-'FAIL: The agent did not write a verdict.'}
+          set-output verdict "$VERDICT"
+          set-output session_url "$(node -p 'require("/tmp/session.json").deviceRunSessionUrl')"
+          set-output build_id "$BUILD_ID"
+          set-output commit "$(git rev-parse --short HEAD)"
+
+          # Put the full report on the pull request. A reviewer can read it there, and the
+          # retry job hands it to the coding agent when the verdict is FAIL.
+          if [ -n "${GITHUB_TOKEN:-}" ] && [ -s "$VERDICT_FILE" ]; then
+            {
+              printf '## Agent QA report (%s)\n\n<details>\n<summary>%s</summary>\n\n' "${HEAD_SHA:0:7}" "$VERDICT"
+              tail -n +2 "$VERDICT_FILE"
+              printf '\n</details>\n'
+            } > /tmp/qa-report.md
+            node "$HELPER" comment "$PR_NUMBER" /tmp/qa-report.md || true
+          fi
+      - uses: eas/upload_artifact
+        if: ${{ always() }}
+        with:
+          type: other
+          name: agentic-ci-evidence
+          path: agent-output/evidence/**/*
+
+  # 5. Report on the PR.
+  comment:
+    type: github-comment
+    after: [check]
+    params:
+      payload: |
+        ## PR checks (iOS)
+
+        **Agent QA verdict (advisory):** ${{ after.check.outputs.verdict || 'Agent QA did not run. A scripted check failed first. See the workflow run.' }}
+
+        **Commit:** ${{ after.check.outputs.commit || 'unknown' }}
+
+        - [Session recording](${{ after.check.outputs.session_url }})
+        - [Agent report, screenshots and Maestro results](${{ workflow.url }})
+        - [Try this build in your browser](https://expo.dev/accounts/${{ account.name }}/projects/${{ app.slug }}/simulator-sessions/create?buildId=${{ after.check.outputs.build_id }})
+
+  # The QA verdict is advisory: it is posted on the PR but does not fail the run or start a
+  # retry. An agent's verdict can be wrong, so measure it first. When you have read the
+  # evidence on enough runs to trust it, make it blocking:
+  #   1. Uncomment the result job below.
+  #   2. In the retry job, add this to the end of the `if`, inside the brackets:
+  #        || startsWith(after.check.outputs.verdict, 'FAIL')
+  #
+  # result:
+  #   after: [check]
+  #   if: ${{ after.check.status != 'skipped' && !startsWith(after.check.outputs.verdict, 'PASS') }}
+  #   steps:
+  #     - run: |
+  #         echo "The verdict of the agent is not PASS. See the comment on the pull request."
+  #         exit 1
+
+  # 6. Retry loop. Only for pull requests that the agent opened (branch agent/issue-<n>).
+  retry:
+    name: Send the failure back to the coding agent
+    after: [static, build, repack, e2e, check]
+    if: ${{ startsWith(github.event.pull_request.head.ref, 'agent/issue-') && (after.static.status == 'failure' || after.e2e.status == 'failure') }}
+    environment: preview
+    env:
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+      BRANCH: ${{ github.event.pull_request.head.ref }}
+      HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+      PR_TITLE: ${{ github.event.pull_request.title }}
+      PR_BODY: ${{ github.event.pull_request.body || 'The pull request has no description.' }}
+      STATIC_STATUS: ${{ after.static.status }}
+      BUILD_STATUS: ${{ after.build.status }}
+      REPACK_STATUS: ${{ after.repack.status }}
+      E2E_STATUS: ${{ after.e2e.status }}
+      VERDICT: ${{ after.check.outputs.verdict }}
+      RUN_URL: ${{ workflow.url }}
+      MAX_FIX_ATTEMPTS: '2'
+    steps:
+      - uses: eas/checkout
+      - uses: eas/install_node_modules
+      - name: Ask the coding agent for a fix
+        run: bash .eas/agents/fix-change.sh
+      - uses: eas/upload_artifact
+        if: ${{ always() }}
+        with:
+          type: other
+          name: retry-log
+          path: /tmp/agent-fix/agent-output/**/*
