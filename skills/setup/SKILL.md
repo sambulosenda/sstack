@@ -22,7 +22,7 @@ Ask before you overwrite anything. Make no commit until the person has seen the 
 
 First ask which half the person wants:
 
-- **Local runner only** (`factory-run` on this Mac): `scripts/factory/`, the prompts in `.eas/agents/*.md`, and `AGENTS.md`. No workflows. Pick this when there is no paid Expo plan yet, or when the app's checks need services a cloud job would not have.
+- **Local runner only** (`factory-run` on this Mac): `scripts/factory/` except `maestro-report.test.mjs`, which tests a cloud script, the prompts in `.eas/agents/*.md`, and `AGENTS.md`. No workflows. Pick this when there is no paid Expo plan yet, or when the app's checks need services a cloud job would not have.
 - **Local runner and cloud pipeline**: everything below.
 
 Copy everything in `factory/` that the chosen half needs into the project root, keeping its paths: `.eas/`, `.github/`, `scripts/factory/`, `types/expo.d.ts`, `jest/style-stub.js`, `AGENTS.md`.
@@ -66,7 +66,7 @@ Read the app before you write about it: its README, its routes and screens, its 
   - `"moduleNameMapper"`: `"\\.css$": "<rootDir>/jest/style-stub.js"` when the app imports CSS, and `"^@/assets/(.*)$": "<rootDir>/assets/$1"` when `tsconfig.json` maps `@/assets/*` outside `src/`.
   - If the app uses `react-native-reanimated`: `"resolver": "react-native-reanimated/jest/resolver"`, and a `setupFilesAfterEnv` file that calls `require('react-native-reanimated').setUpTests()`.
   - If the app has no test yet, add one that renders the first screen and finds its root testID, so the Jest run has something to pass. Put it outside `src/app/`: Expo Router treats every file there as a route.
-- **Maestro.** The factory needs at least one flow in `.maestro/` that launches the app and asserts the first screen's root testID. If there is none, write it, and add the testID to the screen if it is missing.
+- **Maestro.** The factory needs at least one flow that launches the app and asserts the first screen's root testID. If there is none, write it, and add the testID to the screen if it is missing. If the app's existing flows need inputs prepared by hand (an invitation token, a signed-in account), put the factory's own self-contained flows in `.maestro/factory/`: the build script then runs only those.
 
 ## 4. Optional: the style rules
 

@@ -4,6 +4,8 @@
 #
 # Usage: bash scripts/factory/local-build-test.sh <simulator UDID>
 # Writes agent-output/build.log, agent-output/maestro.log and agent-output/app-path.txt.
+# Runs the flows in .maestro/factory/ when that folder exists, and otherwise every flow in .maestro/.
+# An app whose flows need inputs prepared by hand keeps them outside .maestro/factory/.
 # Exit code: 0 when the build and every flow pass, 1 when the build fails, 2 when a flow fails.
 set -uo pipefail
 
@@ -37,8 +39,12 @@ if [ ! -x "$MAESTRO" ]; then
   exit 0
 fi
 
+FLOWS_DIR=.maestro
+[ -d .maestro/factory ] && FLOWS_DIR=.maestro/factory
+echo "maestro: running the flows in $FLOWS_DIR"
+
 run_flows() {
-  "$MAESTRO" --udid "$UDID" test .maestro -e MAESTRO_APP_ID="$BUNDLE_ID" \
+  "$MAESTRO" --udid "$UDID" test "$FLOWS_DIR" -e MAESTRO_APP_ID="$BUNDLE_ID" \
     --test-output-dir "$OUT/maestro" > "$OUT/maestro.log" 2>&1
 }
 run_flows
@@ -54,6 +60,11 @@ if [ "$FLOWS" -ne 0 ] && ! grep -q '\[Failed\]' "$OUT/maestro.log"; then
 fi
 grep -E '\[(Passed|Failed)\]|Flows' "$OUT/maestro.log"
 if [ "$FLOWS" -ne 0 ]; then
+  # Every flow failing at once is usually not the change: a system prompt can cover the app, such
+  # as "Open in <app>?" the first time a new URL scheme opens it. Look at the simulator first.
+  if ! grep -q '\[Passed\]' "$OUT/maestro.log"; then
+    echo "maestro: every flow failed. Check the simulator for a system prompt covering the app before blaming the change."
+  fi
   echo "maestro: FAILED. See $OUT/maestro.log"
   exit 2
 fi
