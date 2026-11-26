@@ -67,12 +67,26 @@ bash scripts/factory/local-prepare-checks.sh <issue file> <UDID>
 
 It reinstalls the app so QA starts on onboarding like a new user, clears old evidence, writes the review folder `agent-output/review/`, and writes two briefs: `agent-output/qa-brief.md` and `agent-output/review-brief.md`. They come from the templates in `scripts/factory/briefs/`. When something a tester needed was missing, fix the template, not the brief, so the next run has it too.
 
-Then start two fresh subagents in parallel, neither of which has seen your work:
+Record what the project looks like now, so you can tell afterwards whether a checker changed it:
 
-- **QA**: the text of `agent-output/qa-brief.md`, as it is. Add a short "Notes for this issue" section only for what is specific to this issue, such as a system setting it needs or how long a session takes to end. It writes `agent-output/evidence/verdict.md`.
-- **Review**: the text of `agent-output/review-brief.md`, as it is. It writes `agent-output/review/review.md`.
+```sh
+git status --porcelain --untracked-files=all | grep -v ' agent-output/' > /tmp/before-checks.txt
+```
 
-Both verdicts are advice: report them as they are, do not retry on them, and do not edit them. Do not fix review findings on your own: the person decides. If you cannot start a subagent, do the station yourself and say in the report that the checker was also the author.
+Then start two fresh subagents in parallel, neither of which has seen your work. Use the plugin's own agents, whose tools are limited to what each station needs:
+
+- **QA**, agent type `sstack:qa`: the text of `agent-output/qa-brief.md`, as it is. Add a short "Notes for this issue" section only for what is specific to this issue, such as a system setting it needs or how long a session takes to end. It writes `agent-output/evidence/verdict.md`.
+- **Review**, agent type `sstack:reviewer`: the text of `agent-output/review-brief.md`, as it is. It has no shell and cannot run commands. It writes `agent-output/review/review.md`.
+
+When both are done, check that neither changed the project:
+
+```sh
+git status --porcelain --untracked-files=all | grep -v ' agent-output/' | diff /tmp/before-checks.txt -
+```
+
+Any output means a checker touched a file outside `agent-output/`. Undo that change, say so in the report, and treat that checker's verdict as void.
+
+Both verdicts are advice: report them as they are, do not retry on them, and do not edit them. Do not fix review findings on your own: the person decides. If the sstack agents are not available, use general-purpose subagents with the same briefs, and say so in the report. If you cannot start a subagent at all, do the station yourself and say in the report that the checker was also the author.
 
 ## 7b. Re-check a fix
 
@@ -85,7 +99,7 @@ node scripts/factory/fix-scope.mjs <commit QA and review saw>
 It prints the smallest re-check the fix needs. You may do more, never less.
 
 - **none**: only wording, docs or comments changed. Run station 3.
-- **single**: run stations 3 and 4, then one fresh reviewer: `bash scripts/factory/local-prepare-checks.sh <issue file> <UDID> <commit QA and review saw>` writes a review brief for the fix alone. Describe in `agent-output/summary.md` which findings the fix addresses before you run it.
+- **single**: run stations 3 and 4, then one fresh `sstack:reviewer`, with the same before-and-after `git status` check: `bash scripts/factory/local-prepare-checks.sh <issue file> <UDID> <commit QA and review saw>` writes a review brief for the fix alone. Describe in `agent-output/summary.md` which findings the fix addresses before you run it.
 - **full**: run stations 3, 4, 6 and 7 again.
 
 Report what the re-check found. A fix that skips its re-check is code that nobody checked.

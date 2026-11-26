@@ -42,6 +42,17 @@ Then, in the root of your Expo app, run `/sstack:setup`. It copies the factory i
 
 `add-screen` and `add-analytics-event` assume the folder layout in `AGENTS.md`. `setup` adapts that file to your app.
 
+## Agents
+
+`factory-run` hands QA and review to two subagents that ship with the plugin. Neither has seen the work it checks, and each has only the tools its station needs, so the limits are enforced rather than asked for.
+
+| Agent | Tools | Cannot |
+| --- | --- | --- |
+| `sstack:reviewer` | Read, Glob, Grep, Write | run any shell command, edit code |
+| `sstack:qa` | the argent simulator tools, Read, Glob, Grep, Write, Bash | edit code, use any other MCP server |
+
+`Write` and QA's shell cannot be narrowed further, so `factory-run` compares `git status` before and after the checkers: if either touched a file outside `agent-output/`, the change is undone and that verdict is void.
+
 ## What the factory enforces
 
 These are checks in code, not requests in a prompt.
