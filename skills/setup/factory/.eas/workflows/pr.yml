@@ -18,7 +18,8 @@ on:
   pull_request:
     branches: ['main']
     types: ['opened', 'reopened', 'synchronize', 'ready_for_review']
-    if: ${{ !github.event.pull_request.draft }}
+    # Only pull requests from this repository: a fork's code would run with the secrets.
+    if: ${{ !github.event.pull_request.draft && github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name }}
 
 # A new commit on a pull request cancels the run for the old commit.
 concurrency:
@@ -35,19 +36,20 @@ jobs:
       BRANCH: ${{ github.event.pull_request.head.ref }}
     steps:
       - uses: eas/checkout
-      - uses: eas/install_node_modules
+      - name: Install packages, with no secrets in reach
+        run: bash .eas/agents/no-secrets.sh npm ci
       - name: Label the pull request with its risk (advice, never fails)
         run: node scripts/factory/risk.mjs || true
       - name: Agent pull requests do not weaken tests or checks
         run: node scripts/factory/check-guardrails.mjs
       - name: Typecheck
-        run: npx tsc --noEmit
+        run: bash .eas/agents/no-secrets.sh npx tsc --noEmit
       - name: Lint
-        run: npx expo lint
+        run: bash .eas/agents/no-secrets.sh npx expo lint
       - name: Maestro flows only use testIDs that exist
         run: node scripts/factory/check-testids.mjs
       - name: Unit tests
-        run: npx jest --ci
+        run: bash .eas/agents/no-secrets.sh npx jest --ci
       - name: Factory script tests
         run: node --test "scripts/factory/*.test.mjs"
 
@@ -65,7 +67,8 @@ jobs:
       PR_BODY: ${{ github.event.pull_request.body || 'The pull request has no description.' }}
     steps:
       - uses: eas/checkout
-      - uses: eas/install_node_modules
+      - name: Install packages, with no secrets in reach
+        run: bash .eas/agents/no-secrets.sh npm ci
       - name: Review the diff
         run: bash .eas/agents/review.sh || true
       - uses: eas/upload_artifact
@@ -148,7 +151,8 @@ jobs:
       commit: ${{ steps.check.outputs.commit }}
     steps:
       - uses: eas/checkout
-      - uses: eas/install_node_modules
+      - name: Install packages, with no secrets in reach
+        run: bash .eas/agents/no-secrets.sh npm ci
       - id: check
         name: Test the pull request on a remote iOS Simulator
         run: |
@@ -242,7 +246,7 @@ jobs:
   retry:
     name: Send the failure back to the coding agent
     after: [static, build, repack, e2e, check]
-    if: ${{ startsWith(github.event.pull_request.head.ref, 'agent/issue-') && (after.static.status == 'failure' || after.e2e.status == 'failure') }}
+    if: ${{ github.event.pull_request.head.repo.full_name == github.event.pull_request.base.repo.full_name && startsWith(github.event.pull_request.head.ref, 'agent/issue-') && (after.static.status == 'failure' || after.e2e.status == 'failure') }}
     environment: preview
     env:
       PR_NUMBER: ${{ github.event.pull_request.number }}
@@ -259,7 +263,8 @@ jobs:
       MAX_FIX_ATTEMPTS: '2'
     steps:
       - uses: eas/checkout
-      - uses: eas/install_node_modules
+      - name: Install packages, with no secrets in reach
+        run: bash .eas/agents/no-secrets.sh npm ci
       - name: Ask the coding agent for a fix
         run: bash .eas/agents/fix-change.sh
       - uses: eas/upload_artifact

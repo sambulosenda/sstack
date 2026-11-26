@@ -8,7 +8,11 @@ set -euo pipefail
 : "${ISSUE_NUMBER:?No issue number. Check the intake job, or pass -F issue_number=<number>.}"
 : "${PLATFORM:?No platform. Set PLATFORM to android or ios in the reproduce job.}"
 
-node .eas/agents/github.mjs issue "$ISSUE_NUMBER" > /tmp/issue.json
+# The agent can write files. Keep the script that later runs with the token out of its reach,
+# and read its verdict only through a copy (see clones.sh).
+source .eas/agents/clones.sh
+HELPER=$(trusted_copy .eas/agents/github.mjs)
+node "$HELPER" issue "$ISSUE_NUMBER" > /tmp/issue.json
 source .eas/agents/start-session.sh "$PLATFORM" "$BUILD_ID" "Issue #$ISSUE_NUMBER triage" bug-triage
 
 {
@@ -22,7 +26,8 @@ source .eas/agents/start-session.sh "$PLATFORM" "$BUILD_ID" "Issue #$ISSUE_NUMBE
 env -u EXPO_TOKEN -u EXPO_TOKEN_SIMULATOR -u GITHUB_TOKEN \
   timeout 20m bash .eas/agents/run-agent.sh agent-output/prompt.md device || true
 
-VERDICT=$(head -n 1 agent-output/evidence/verdict.md 2> /dev/null || true)
+VERDICT_FILE=$(agent_file agent-output/evidence/verdict.md)
+VERDICT=$(head -n 1 "$VERDICT_FILE")
 PLATFORM_NAME=$([ "$PLATFORM" = ios ] && echo iOS || echo Android)
 VERDICT=${VERDICT:-"INCONCLUSIVE: The agent did not write a verdict. See the logs of this run."}
 SESSION_URL=$(node -p 'require("/tmp/session.json").deviceRunSessionUrl')
@@ -32,10 +37,10 @@ SESSION_URL=$(node -p 'require("/tmp/session.json").deviceRunSessionUrl')
   printf -- '- [Session recording](%s)\n' "$SESSION_URL"
   printf -- '- [Agent report and screenshots](%s)\n\n' "$RUN_URL"
   printf '<details>\n<summary>Report</summary>\n\n'
-  tail -n +2 agent-output/evidence/verdict.md 2> /dev/null || true
+  tail -n +2 "$VERDICT_FILE"
   printf '\n</details>\n'
   case "$VERDICT" in
     REPLICATED:*) printf '\nTo start Issue to PR, read the report, then add the `agent` label.\n' ;;
   esac
 } > /tmp/comment.md
-node .eas/agents/github.mjs comment "$ISSUE_NUMBER" /tmp/comment.md
+node "$HELPER" comment "$ISSUE_NUMBER" /tmp/comment.md

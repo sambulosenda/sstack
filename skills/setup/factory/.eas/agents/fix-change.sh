@@ -76,7 +76,7 @@ run_check() {
   local name=$1
   shift
   printf '#### %s\n\n' "$name"
-  if (cd "$APP_DIR" && env -u GITHUB_TOKEN -u EXPO_TOKEN -u EXPO_TOKEN_SIMULATOR CI=1 "$@" > /tmp/check.log 2>&1); then
+  if (cd "$APP_DIR" && env -u GITHUB_TOKEN -u EXPO_TOKEN -u EXPO_TOKEN_SIMULATOR -u ANTHROPIC_API_KEY -u CLAUDE_CODE_OAUTH_TOKEN CI=1 "$@" > /tmp/check.log 2>&1); then
     printf 'Passed.\n\n'
   else
     printf 'Failed. The end of the output:\n\n```\n'

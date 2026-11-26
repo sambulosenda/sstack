@@ -25,6 +25,7 @@ Copy everything in `factory/` into the project root, keeping its paths: `.eas/`,
 - If a file already exists, do not overwrite it. List each clash, show the difference, and ask whether to merge, keep theirs, or take ours.
 - If the project already has an `AGENTS.md` or `CLAUDE.md`, merge: keep their rules, add the factory's sections, and ask about any rule that contradicts one of theirs.
 - Make the `.sh` files executable.
+- The workflows install packages with `npm ci`, through `.eas/agents/no-secrets.sh` so the pull request's install scripts never see a token. If the app uses Yarn, pnpm or Bun, change those steps in `.eas/workflows/pr.yml` and `.github/workflows/agent-label.yml` to its install command, and keep the `no-secrets.sh` prefix.
 
 ## 2. Make it true for this app
 

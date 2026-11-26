@@ -53,6 +53,8 @@ These are checks in code, not requests in a prompt.
 | Every testID a Maestro flow uses exists in the app | `check-testids.mjs` |
 | A fix after QA and review gets a re-check sized to the fix | `fix-scope.mjs` |
 | The push happens in a clean clone no agent touched, and agents never hold a token | `clones.sh` |
+| Code from a pull request (package installs, lint, tests) runs with every secret removed | `no-secrets.sh`, `pr.yml` |
+| Only pull requests from the repository itself run the pipeline, never a fork's | `pr.yml` |
 | At most 2 fix attempts per pull request, 10 agent pull requests a day | `pr.yml`, `issue-to-pr.yml` |
 
 QA and review are advice. Their verdicts never fail a run until you choose to make QA blocking, after you have measured how often it is right.
