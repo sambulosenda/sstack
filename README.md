@@ -92,11 +92,13 @@ Turn it on in stages: a pull request by hand first, then one tiny labelled issue
 
 - Twelve issues of a real app went through the local runner end to end, and a thirteenth ended, correctly, in "no change" with the evidence written up. The fresh reviewer found real bugs that the author missed, and re-checking fixes found more.
 - Each guardrail has a test that fails on the mistake it was written for.
+- `setup` was run step by step on a fresh `create-expo-app` (SDK 58): the factory's 48 tests, Jest, and the testID check pass there. The fresh template itself fails one typecheck and one lint check in two web files; `setup` reports those rather than hiding them.
+- The local build and QA stations of `factory-run` have run only on the app the factory grew up in, not yet on a fresh one.
 - The cloud workflows validate against Expo's schema, and the job scripts were run against a local git remote and an agent that attacks them. They have **not yet run on Expo's servers**. Expect to fix a few things on the first real run, and please open an issue when you do.
 
 ## Known limits
 
-- An agent runs as the same OS user as the job that holds the GitHub token. Tokens are removed from its environment and the push happens in a clean clone, but a prompt-injected agent could still read the token from its parent process or change files outside its folder. Limit the damage: a GitHub token for this one repository, an Expo robot user with the Developer role, and the daily cap on agent pull requests. Running each agent in a job of its own is the planned fix.
+- An agent runs as the same OS user as the job that holds the GitHub token. Tokens are removed from its environment and the push happens in a clean clone, but a prompt-injected agent could still read the token from its parent process or change files outside its folder. Limit the damage: a GitHub token for this one repository, an Expo robot user with the Developer role, and the daily cap on agent pull requests. The retry job is where this matters most: the fix agent runs the pull request's code there, beside the token. Running each agent in a job of its own, with no token, is the planned fix.
 - The cloud pipeline has not yet run on Expo's servers. Treat it as experimental.
 - A FAIL from the QA agent can be wrong. It usually lacked a fact: add it to `.eas/agents/app-facts.md`.
 - The pipeline tests iOS. Android needs a second PR workflow.

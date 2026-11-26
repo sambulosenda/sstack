@@ -20,7 +20,7 @@ Ask before you overwrite anything. Make no commit until the person has seen the 
 
 ## 1. Copy
 
-Copy everything in `factory/` into the project root, keeping its paths: `.eas/`, `.github/`, `scripts/factory/`, `AGENTS.md`.
+Copy everything in `factory/` into the project root, keeping its paths: `.eas/`, `.github/`, `scripts/factory/`, `types/expo.d.ts`, `jest/style-stub.js`, `AGENTS.md`.
 
 - If a file already exists, do not overwrite it. List each clash, show the difference, and ask whether to merge, keep theirs, or take ours.
 - If the project already has an `AGENTS.md` or `CLAUDE.md`, merge: keep their rules, add the factory's sections, and ask about any rule that contradicts one of theirs.
@@ -33,14 +33,14 @@ Copy everything in `factory/` into the project root, keeping its paths: `.eas/`,
 
 Read the app before you write about it: its routes, its screens, its `src/` layout, `package.json`, `app.json`.
 
-1. **Bundle ID.** In `.eas/workflows/pr.yml`, set `MAESTRO_APP_ID` to the app's iOS bundle identifier. If it is still a placeholder such as `com.yourcompany.yourapp`, ask the person for the real one.
+1. **Bundle ID.** In `.eas/workflows/pr.yml`, set `MAESTRO_APP_ID` to the app's iOS bundle identifier. A new Expo app has none, and older ones may have a placeholder such as `com.yourcompany.yourapp`: then ask the person for the real one, and set `ios.bundleIdentifier` and `android.package` in `app.json` too.
 2. **AGENTS.md.**
    - "What this project is": draft two or three sentences from the code, show them, and let the person correct them. Remove the EDIT comment.
    - "Stack" and "Folder layout": describe what the project has, not what the template had. Remove any library or folder that is not there. Remove the EDIT comment.
    - "Conventions" and "Test IDs": keep the rules that fit. Where the app has no shared button, strings file or theme file, drop the rule or ask whether to add one.
    - "Rules and what enforces them": every row must name a check that exists in this project, or say "Nothing yet". Do not leave a row that points at a check you did not install.
 3. **App facts.** Fill in `.eas/agents/app-facts.md` from the running app or the code: the first screen and how to get past it, the screens and their root testIDs, timings, and what looks like a bug but is correct. Mark anything you could not confirm.
-4. **Risk and fix-scope paths.** `scripts/factory/risk.mjs` and `scripts/factory/fix-scope.mjs` name paths such as `src/lib/purchases` and `src/lib/strings.ts`. Change them to this app's equivalents, and run their tests.
+4. **Risk and fix-scope paths.** `scripts/factory/risk.mjs` and `scripts/factory/fix-scope.mjs` name paths such as `src/lib/purchases` and `src/lib/strings.ts`. A rule for a path the app does not have never matches, so it does no harm. Add rules for this app's sensitive paths (payments, auth, persisted data), and run their tests.
 
 ## 3. Wire it in
 
@@ -50,8 +50,14 @@ Read the app before you write about it: its routes, its screens, its `src/` layo
   - `"test:factory": "node --test \"scripts/factory/*.test.mjs\""`
   - `"verify"`: the project's typecheck, `expo lint`, `check:testids`, and its Jest run with `--ci`, chained with `&&`.
 - **.gitignore.** Add `agent-output/`, `.argent/` and `*.profraw`.
-- **ESLint.** Add a block with `linterOptions: { noInlineConfig: true }`, so no comment can switch a rule off. `scripts/factory/check-guardrails.mjs` already fails an agent pull request that edits an ESLint config.
-- **Jest.** If the setup files mock modules such as AsyncStorage, recommend `clearMocks: true`, so a stub in one test cannot leak into the next.
+- **ESLint.** A new Expo app has no ESLint config until `npx expo lint` first runs, which creates it. Then add a block with `linterOptions: { noInlineConfig: true }`, so no comment can switch a rule off. `scripts/factory/check-guardrails.mjs` already fails an agent pull request that edits an ESLint config.
+- **TypeScript.** `types/expo.d.ts` declares Expo's types, so the typecheck passes in CI, where the gitignored `expo-env.d.ts` does not exist. Add `"types": ["jest"]` to `compilerOptions` in `tsconfig.json` once Jest is in.
+- **Jest.** The factory's agents write tests and the pipeline runs them, so the app needs Jest. If it has none, ask, then install with `npx expo install jest-expo jest @types/jest @react-native/jest-preset @testing-library/react-native -- --save-dev`. In the Jest config:
+  - `"preset": "jest-expo"` and `"clearMocks": true`, so a stub in one test cannot leak into the next.
+  - `"testPathIgnorePatterns": ["/node_modules/", "/.eas/", "/scripts/"]`. Without it Jest picks up the factory's own `*.test.mjs` files, which run under `node --test`, and fails. Add this even when the app already had Jest.
+  - `"moduleNameMapper"`: `"\\.css$": "<rootDir>/jest/style-stub.js"` when the app imports CSS, and `"^@/assets/(.*)$": "<rootDir>/assets/$1"` when `tsconfig.json` maps `@/assets/*` outside `src/`.
+  - If the app uses `react-native-reanimated`: `"resolver": "react-native-reanimated/jest/resolver"`, and a `setupFilesAfterEnv` file that calls `require('react-native-reanimated').setUpTests()`.
+  - If the app has no test yet, add one that renders the first screen and finds its root testID, so the Jest run has something to pass. Put it outside `src/app/`: Expo Router treats every file there as a route.
 - **Maestro.** The factory needs at least one flow in `.maestro/` that launches the app and asserts the first screen's root testID. If there is none, write it, and add the testID to the screen if it is missing.
 
 ## 4. Optional: the style rules
@@ -62,7 +68,9 @@ Ask whether to install them. If yes: add the rules to the project's ESLint confi
 
 ## 5. Check
 
-Run `npm run test:factory`, then `npm run verify`. Fix what the factory files cause. Report, and do not fix, failures that were there before.
+Run `npm run test:factory`, then `npm run verify`. Fix what the factory files cause. Report, and do not fix, failures that were there before. To tell them apart, check whether the failing file is one you added or changed.
+
+A new Expo SDK 58 app fails its own typecheck in `src/components/app-tabs.web.tsx` and its own lint in `src/hooks/use-color-scheme.web.ts`. Those are template issues: report them, and say each needs a one-line fix before the pipeline's checks can pass.
 
 ## 6. Report
 

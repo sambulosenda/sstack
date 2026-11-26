@@ -272,7 +272,7 @@ jobs:
     steps:
       - uses: eas/checkout
       - name: Install packages without running their install scripts
-        run: npm ci --ignore-scripts
+        run: env -i PATH="$PATH" HOME="$HOME" npm ci --ignore-scripts
       - name: Ask the coding agent for a fix
         run: bash .eas/agents/fix-change.sh
       - uses: eas/upload_artifact
