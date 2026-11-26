@@ -25,7 +25,9 @@ Copy everything in `factory/` into the project root, keeping its paths: `.eas/`,
 - If a file already exists, do not overwrite it. List each clash, show the difference, and ask whether to merge, keep theirs, or take ours.
 - If the project already has an `AGENTS.md` or `CLAUDE.md`, merge: keep their rules, add the factory's sections, and ask about any rule that contradicts one of theirs.
 - Make the `.sh` files executable.
-- The workflows install packages with `npm ci`, through `.eas/agents/no-secrets.sh` so the pull request's install scripts never see a token. If the app uses Yarn, pnpm or Bun, change those steps in `.eas/workflows/pr.yml` and `.github/workflows/agent-label.yml` to its install command, and keep the `no-secrets.sh` prefix.
+- The retry job in `.eas/workflows/pr.yml` installs with `npm ci --ignore-scripts`, and `.github/workflows/agent-label.yml` with `npm ci`. If the app uses Yarn, pnpm or Bun, change them to its install command, still without install scripts in the retry job.
+- The static job runs the pull request's code in the `development` environment. Tell the person to keep that environment free of secrets.
+- `.eas/agents/start-session.sh` reads the bundle ID from `app.json`. If the app uses `app.config.js` instead, ask how to get the ID without running the config in a job that holds tokens.
 
 ## 2. Make it true for this app
 

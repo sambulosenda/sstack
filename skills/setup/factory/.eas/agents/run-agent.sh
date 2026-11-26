@@ -22,7 +22,10 @@ case "$2" in
 esac
 
 mkdir -p agent-output/evidence
-npx --yes @anthropic-ai/claude-code@2.1.325 -p "Do the task that standard input describes." \
+# From an empty prefix, so a package of the same name planted in the project's node_modules
+# (a lockfile can point it anywhere) never runs with the model key. Plain npx would run it.
+npm exec --yes --prefix "$(mktemp -d)" --package=@anthropic-ai/claude-code@2.1.325 -- \
+  claude -p "Do the task that standard input describes." \
   --allowedTools "$tools" --permission-mode dontAsk --max-turns 80 \
   --output-format stream-json --verbose < "$1" > agent-output/evidence/agent-log.jsonl || {
   tail -n 1 agent-output/evidence/agent-log.jsonl >&2

@@ -17,7 +17,7 @@ Expo ships breaking changes every SDK release. APIs you remember are likely rena
 
 ## Stack
 
-<!-- EDIT: keep this list true. Agents trust it. -->
+<!-- EDIT: keep this list true. Agents trust it. The lines below are an example app's: replace them with this app's stack. -->
 - Expo with Continuous Native Generation. The `ios/` and `android/` folders are generated and not committed. Never create or edit them. Configure native behaviour in `app.json` and config plugins.
 - TypeScript, strict mode. React Compiler is on.
 - Expo Router. Routes live in `src/app/`.
@@ -29,6 +29,7 @@ Expo ships breaking changes every SDK release. APIs you remember are likely rena
 
 ## Folder layout
 
+<!-- EDIT: describe this app's folders. The block below is an example layout. -->
 ```
 src/app/              routes only. A route file renders one screen component and nothing else.
 src/features/<name>/  screens, hooks, logic and tests for one feature.
@@ -57,6 +58,7 @@ Install packages with `npx expo install <package>`, never `npm install <package>
 
 ## Conventions
 
+<!-- EDIT: the rules about theme tokens, a strings file, a shared button and src/lib wrappers assume an app built that way. Drop or adapt the ones this app does not have. -->
 - One change per pull request. Make the smallest change that satisfies the issue.
 - Function components and hooks only.
 - No `any`. No `@ts-ignore`. No eslint-disable comments. If a type is hard, fix the type.
@@ -76,10 +78,6 @@ Install packages with `npx expo install <package>`, never `npm install <package>
 - Write a testID that a Maestro flow uses as a plain string literal, so `check-testids` can find it.
 - Never rename or remove a `testID` without updating `.maestro/` in the same pull request. `node scripts/factory/check-testids.mjs` fails if you forget.
 - A new screen needs a Maestro flow in `.maestro/` that opens it and asserts its root `testID`.
-
-## Purchases run in preview mode on simulator builds
-
-With no RevenueCat API key in the environment, `src/lib/purchases` configures nothing. The paywall shows placeholder plans, a purchase returns `{ status: 'preview' }`, and nobody can be charged. Tests and the pipeline's simulator builds run this way. Keep it working: every purchase path must handle the `preview` status.
 
 ## Accessibility
 
@@ -108,14 +106,14 @@ A rule that nothing checks is a request. When a mistake happens twice, fix it at
 | Do not delete tests or flows, or remove more tests or assertions than you add | `scripts/factory/check-guardrails.mjs` |
 | Do not change `.eas/`, `.github/` or `scripts/factory/` | `make-change.sh` and `fix-change.sh` refuse the pull request |
 | Every testID a Maestro flow uses exists in `src/` as a literal | `scripts/factory/check-testids.mjs`, which ignores comments |
-| Never `jest.spyOn` AsyncStorage, AccessibilityInfo or AppState, and stub them only with the `Once` forms | ESLint `no-restricted-syntax` in `eslint.config.js`; `clearMocks` in the Jest config resets calls between tests |
 | A behaviour the running app cannot show goes under `Covered by tests`, not under acceptance criteria | Triage asks to move it; QA leaves it out of its verdict |
 | A fix made after QA and review gets at least the re-check its size and kind need | `scripts/factory/fix-scope.mjs` in the local runner; in the cloud every push runs every check again |
 | Every pressable has a role and a label, with a touch target of 44 points | `AppButton`, for buttons only |
-| No inline colours, font sizes or spacing numbers | ESLint `no-restricted-syntax` in `eslint.config.js`, proven by `scripts/factory/lint-rules.test.mjs`. Four Expo template files are on an exception list that only shrinks |
-| All user-facing copy lives in `src/lib/strings.ts` | ESLint `no-restricted-syntax`: text in JSX and in label, title or placeholder props |
-| Never import `react-native-purchases`, `posthog-react-native` or AsyncStorage outside `src/lib` | ESLint `no-restricted-imports`; tests may import them to stub the mocks |
-| Do not change the lint rules in `eslint.config.js` | `scripts/factory/check-guardrails.mjs` |
+| No inline colours, font sizes or spacing numbers | Nothing yet. The review agent looks for it. The optional sstack style rules enforce it with ESLint |
+| All user-facing copy lives in `src/lib/strings.ts` | Nothing yet. The review agent looks for it. The optional sstack style rules enforce it with ESLint |
+| Never import `react-native-purchases`, `posthog-react-native` or AsyncStorage outside `src/lib` | Nothing yet. The review agent looks for it. The optional sstack style rules enforce it with ESLint |
+| Do not change, rename or add an ESLint config | `scripts/factory/check-guardrails.mjs` |
+| No comment can switch a lint rule off | `linterOptions: { noInlineConfig: true }` in the ESLint config |
 | Logic lives outside the screen file, with a test next to it | Nothing yet. A judgment call; the review agent looks for it |
 
 ## When you finish
@@ -128,6 +126,7 @@ Write a summary a reviewer can check against the app:
 4. Two sections that tell the reviewer how closely to look. Each starts with `**Verdict:** Low`, `Medium` or `High`, then one or two sentences that name the files or data behind the verdict. When two levels fit, pick the higher.
 
    `## Impact`: how much of the app the change can break.
+   <!-- EDIT: name this app's paths in the three levels below. -->
    - Low: files in one `src/features/<name>/` folder only.
    - Medium: shared code that several screens use: `src/components/`, `src/constants/theme.ts`, `src/lib/strings.ts`, or routes in `src/app/`.
    - High: `src/lib/purchases`, `src/lib/analytics`, `src/lib/storage.ts`, `app.json`, `package.json`, or anything on the "Never touch" list.

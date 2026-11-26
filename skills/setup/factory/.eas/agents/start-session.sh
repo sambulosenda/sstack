@@ -13,8 +13,9 @@ case "$1" in
     exit 1
     ;;
 esac
-APP_ID=$(npx expo config --json | node -e 'const config = JSON.parse(require("fs").readFileSync(0, "utf8")); console.log(config[process.argv[1]]?.[process.argv[2]] ?? "")' "$1" "$APP_ID_KEY")
-: "${APP_ID:?The app config has no app ID for $1. Add it to app.json or app.config.js.}"
+# Read app.json with Node's built-ins: this job holds tokens, so it runs no code from the project.
+APP_ID=$(node -e 'const config = JSON.parse(require("fs").readFileSync("app.json", "utf8")).expo ?? {}; console.log(config[process.argv[1]]?.[process.argv[2]] ?? "")' "$1" "$APP_ID_KEY")
+: "${APP_ID:?The app config has no app ID for $1. Add it to app.json.}"
 mkdir -p agent-output/evidence
 
 export EXPO_TOKEN="$EXPO_TOKEN_SIMULATOR"

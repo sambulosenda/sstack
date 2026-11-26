@@ -27,29 +27,41 @@ concurrency:
   cancel_in_progress: true
 
 jobs:
-  # 1. Cheap, deterministic gates. Nothing else spends money until these pass.
-  static:
-    name: Typecheck, lint, unit tests
+  # 1. Guardrails. This job holds the GitHub token, so it runs no code from the pull request: it
+  # installs nothing, and its two scripts use only Node's built-ins. Agents cannot change
+  # scripts/factory/ (make-change.sh and fix-change.sh refuse it). A failure here stops the run for
+  # a person; it does not go back to the agent.
+  guardrails:
+    name: Risk label and guardrails
     environment: preview
     env:
       PR_NUMBER: ${{ github.event.pull_request.number }}
       BRANCH: ${{ github.event.pull_request.head.ref }}
     steps:
       - uses: eas/checkout
-      - name: Install packages, with no secrets in reach
-        run: bash .eas/agents/no-secrets.sh npm ci
       - name: Label the pull request with its risk (advice, never fails)
         run: node scripts/factory/risk.mjs || true
       - name: Agent pull requests do not weaken tests or checks
         run: node scripts/factory/check-guardrails.mjs
+
+  # 1a. Cheap, deterministic gates. They run the pull request's code (install scripts, the lint
+  # config, tests), so this job uses the development environment, which must hold no secrets.
+  # Nothing else spends money until these pass.
+  static:
+    name: Typecheck, lint, unit tests
+    needs: [guardrails]
+    environment: development
+    steps:
+      - uses: eas/checkout
+      - uses: eas/install_node_modules
       - name: Typecheck
-        run: bash .eas/agents/no-secrets.sh npx tsc --noEmit
+        run: npx tsc --noEmit
       - name: Lint
-        run: bash .eas/agents/no-secrets.sh npx expo lint
+        run: npx expo lint
       - name: Maestro flows only use testIDs that exist
         run: node scripts/factory/check-testids.mjs
       - name: Unit tests
-        run: bash .eas/agents/no-secrets.sh npx jest --ci
+        run: npx jest --ci
       - name: Factory script tests
         run: node --test "scripts/factory/*.test.mjs"
 
@@ -67,8 +79,6 @@ jobs:
       PR_BODY: ${{ github.event.pull_request.body || 'The pull request has no description.' }}
     steps:
       - uses: eas/checkout
-      - name: Install packages, with no secrets in reach
-        run: bash .eas/agents/no-secrets.sh npm ci
       - name: Review the diff
         run: bash .eas/agents/review.sh || true
       - uses: eas/upload_artifact
@@ -151,8 +161,6 @@ jobs:
       commit: ${{ steps.check.outputs.commit }}
     steps:
       - uses: eas/checkout
-      - name: Install packages, with no secrets in reach
-        run: bash .eas/agents/no-secrets.sh npm ci
       - id: check
         name: Test the pull request on a remote iOS Simulator
         run: |
@@ -263,8 +271,8 @@ jobs:
       MAX_FIX_ATTEMPTS: '2'
     steps:
       - uses: eas/checkout
-      - name: Install packages, with no secrets in reach
-        run: bash .eas/agents/no-secrets.sh npm ci
+      - name: Install packages without running their install scripts
+        run: npm ci --ignore-scripts
       - name: Ask the coding agent for a fix
         run: bash .eas/agents/fix-change.sh
       - uses: eas/upload_artifact

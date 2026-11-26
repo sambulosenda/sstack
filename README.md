@@ -53,8 +53,9 @@ These are checks in code, not requests in a prompt.
 | Every testID a Maestro flow uses exists in the app | `check-testids.mjs` |
 | A fix after QA and review gets a re-check sized to the fix | `fix-scope.mjs` |
 | The push happens in a clean clone no agent touched, and agents never hold a token | `clones.sh` |
-| Code from a pull request (package installs, lint, tests) runs with every secret removed | `no-secrets.sh`, `pr.yml` |
+| Code from a pull request (package installs, lint, tests) runs only in a job with no secrets; jobs that hold tokens install nothing from it | `pr.yml` |
 | Only pull requests from the repository itself run the pipeline, never a fork's | `pr.yml` |
+| Claude Code starts from an empty npm prefix, so a package planted in `node_modules` cannot pose as it | `run-agent.sh` |
 | At most 2 fix attempts per pull request, 10 agent pull requests a day | `pr.yml`, `issue-to-pr.yml` |
 
 QA and review are advice. Their verdicts never fail a run until you choose to make QA blocking, after you have measured how often it is right.
@@ -81,7 +82,7 @@ Once per app, after `/sstack:setup`:
 2. `eas login`, then `eas init`.
 3. Connect the GitHub repository to the Expo project: https://docs.expo.dev/eas/workflows/get-started/#automate-workflows-with-github-events
 4. Create a robot user with the Developer role in your Expo account, and two tokens for it.
-5. In the Expo project's `preview` environment, add `EXPO_TOKEN_SIMULATOR` (robot token 1), `ANTHROPIC_API_KEY` or `CLAUDE_CODE_OAUTH_TOKEN`, `GITHUB_TOKEN` (fine-grained, this repo only: contents, issues and pull requests, read and write) and `GITHUB_REPOSITORY` (`owner/repo`). The agent can read every variable there, so keep nothing else in it.
+5. In the Expo project's `preview` environment, add `EXPO_TOKEN_SIMULATOR` (robot token 1), `ANTHROPIC_API_KEY` or `CLAUDE_CODE_OAUTH_TOKEN`, `GITHUB_TOKEN` (fine-grained, this repo only: contents, issues and pull requests, read and write) and `GITHUB_REPOSITORY` (`owner/repo`). The agent can read every variable there, so keep nothing else in it. Keep the `development` environment free of secrets: the static checks run pull request code there.
 6. On GitHub: `gh secret set EXPO_TOKEN` (robot token 2), and create the labels `agent`, `bug`, `needs-human`, `needs-spec`, `allow-test-changes`, `risk:low`, `risk:medium` and `risk:high`.
 7. Validate: `for f in .eas/workflows/*.yml; do eas workflow:validate "$f"; done`
 
@@ -95,7 +96,8 @@ Turn it on in stages: a pull request by hand first, then one tiny labelled issue
 
 ## Known limits
 
-- An agent's code runs as the same OS user as the job that later holds the token. The two-clone design keeps the token out of the agent's folder, but a sandbox per agent is the real fix.
+- An agent runs as the same OS user as the job that holds the GitHub token. Tokens are removed from its environment and the push happens in a clean clone, but a prompt-injected agent could still read the token from its parent process or change files outside its folder. Limit the damage: a GitHub token for this one repository, an Expo robot user with the Developer role, and the daily cap on agent pull requests. Running each agent in a job of its own is the planned fix.
+- The cloud pipeline has not yet run on Expo's servers. Treat it as experimental.
 - A FAIL from the QA agent can be wrong. It usually lacked a fact: add it to `.eas/agents/app-facts.md`.
 - The pipeline tests iOS. Android needs a second PR workflow.
 
