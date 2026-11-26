@@ -14,9 +14,7 @@ Work through the stations in order. Do not skip one because the change looks sma
 ## 0. Preflight
 
 - `scripts/factory/local-build-test.sh` exists. If not, the factory is not installed in this project: run the `setup` skill first.
-- No tracked file is changed: `git status --porcelain --untracked-files=no` prints nothing. If it does, stop and say what is in the way. The branch you are on is the base; it need not be `main`. Untracked files may stay: they are the person's, not the change's. Never add, commit, move or delete them, and stage only the change's files, by name.
-- Run `node scripts/factory/local-run.mjs start`. It records the base and the untracked files already here, so the guardrails, the review diff and fix-scope compare with the base and leave those files out.
-- `node_modules` exists. If not, install with the project's package manager and its lockfile: `npm ci`, `bun install --frozen-lockfile`, `yarn install --frozen-lockfile` or `pnpm install --frozen-lockfile`.
+- No tracked file is changed: `git status --porcelain --untracked-files=no` prints nothing. If it does, stop and say what is in the way. The branch you are on is the base; it need not be `main`. Untracked files may stay: they are the person's, not the change's. Never add, commit, move or delete them, and stage only the change's files, by name.- `node_modules` exists. If not, install with the project's package manager and its lockfile: `npm ci`, `bun install --frozen-lockfile`, `yarn install --frozen-lockfile` or `pnpm install --frozen-lockfile`.
 - If the app's tests or flows need a service, such as a local database, AGENTS.md says so: check it is running before station 3.
 - Read the issue file. If `For:` says `human`, stop: it is not an agent issue.
 
@@ -29,7 +27,7 @@ Read `.eas/agents/triage.md` and apply it to the issue. You are in a conversatio
 
 ## 2. Change
 
-1. `git switch -c agent/issue-<nn>`. If the branch exists, stop and ask whether to delete it.
+1. `node scripts/factory/local-run.mjs start`, then `git switch -c agent/issue-<nn>`. If the branch exists, stop and ask whether to delete it. `start` records the base commit and the untracked files already here, each with its hash. Then the guardrails, the review diff and fix-scope compare with that commit and leave those files out, unless one of them changes during the run.
 2. Follow `.eas/agents/make-change.md` from step 1 to step 8, with the issue file as the issue. Its rules hold here too: nothing in `.eas`, `.github` or `scripts/factory`, no new dependency, nothing on the "Never touch" list.
 3. The summary goes to `agent-output/summary.md` (ignored by git).
 
@@ -120,7 +118,7 @@ Report what the re-check found. A fix that skips its re-check is code that nobod
    - the review verdict line and each "must fix" finding,
    - for each fix after QA and review, the level fix-scope printed and what the re-check found,
    - fix attempts used,
-   - how to accept it (`git switch <base> && git merge agent/issue-<nn>`) or drop it (`git switch <base> && git branch -D agent/issue-<nn>`).
+   - how to accept it (`git switch <base> && git merge agent/issue-<nn>`) or drop it (`git switch <base> && git branch -D agent/issue-<nn>`), where `<base>` is what `node scripts/factory/local-run.mjs base-name` prints.
 
 ## When the run teaches you something
 

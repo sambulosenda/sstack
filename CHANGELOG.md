@@ -11,7 +11,9 @@ Works in any Expo app, not only one shaped like the starter. Everything here was
   - `check-testids` reads every app code folder that exists.
   - `factory-run` takes mattpocock-style tickets, installs with the project's package manager, and checks the services the tests need.
   - The change and fix prompts run the checks `AGENTS.md` lists under Commands.
-- **Any base branch, and your own files left alone.** `scripts/factory/local-run.mjs start` records the branch the run began on and the untracked files already there. Before, prepare-checks marked every untracked file as part of the change, and the guardrails counted them. The guardrails, the review diff and `fix-scope` now compare with that branch and leave those files out.
+- **Any base branch, and your own files left alone.** `scripts/factory/local-run.mjs start` records the commit the run began on and the untracked files already there, with their content hashes. Before, prepare-checks marked every untracked file as part of the change, and the guardrails counted them. The guardrails, the review diff and `fix-scope` now compare with that commit and leave those files out. Two exceptions keep this honest:
+  - A file that changes during the run counts as part of the change.
+  - A recorded base that is no longer an ancestor of HEAD is refused.
 - **`fix-scope` sees app code anywhere.** It used to count only `src/`, so it rated a fix to `lib/` and two new migrations "0 changed lines of app code". App code is now any code or SQL file outside tests and the factory. A new migration is new behaviour.
 - **The build script.**
   - It turns Sentry's source-map upload off for the simulator build.
