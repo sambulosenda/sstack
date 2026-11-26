@@ -7,7 +7,7 @@ description: Run one issue through the factory on this machine instead of on Exp
 
 The same stations as the cloud pipeline, with the same prompts and scripts, run by you on this Mac. One issue at a time: the simulator is shared.
 
-The input is an issue file, `docs/issues/<nn>-<slug>.md`, in the shape that `prd-to-issues` writes. The output is a branch `agent/issue-<nn>` with one commit, and a report. You do not merge, push or open a pull request.
+The input is an issue file with a description and checkable acceptance criteria: `docs/issues/<nn>-<slug>.md` in the shape that `prd-to-issues` writes, or a ticket such as `.scratch/<feature>/issues/<nn>-<slug>.md` from mattpocock/skills' `to-tickets`, whose `- [ ]` items are its acceptance criteria. The output is a branch `agent/issue-<nn>` with one commit, and a report. You do not merge, push or open a pull request.
 
 Work through the stations in order. Do not skip one because the change looks small.
 
@@ -15,7 +15,8 @@ Work through the stations in order. Do not skip one because the change looks sma
 
 - `scripts/factory/local-build-test.sh` exists. If not, the factory is not installed in this project: run the `setup` skill first.
 - `git status --porcelain` is empty and the branch is `main`. If not, stop and say what is in the way.
-- `node_modules` exists. If not, `npm ci`.
+- `node_modules` exists. If not, install with the project's package manager and its lockfile: `npm ci`, `bun install --frozen-lockfile`, `yarn install --frozen-lockfile` or `pnpm install --frozen-lockfile`.
+- If the app's tests or flows need a service, such as a local database, AGENTS.md says so: check it is running before station 3.
 - Read the issue file. If `For:` says `human`, stop: it is not an agent issue.
 
 ## 1. Triage
@@ -39,7 +40,7 @@ Run each. All must pass.
 
 ```sh
 node scripts/factory/check-guardrails.mjs --local main
-npm run verify
+npm run verify        # or the project's equivalent: the checks AGENTS.md lists under Commands
 git status --porcelain -- .eas .github scripts/factory   # must print nothing
 ```
 

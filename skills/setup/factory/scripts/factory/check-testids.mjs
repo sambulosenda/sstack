@@ -5,8 +5,10 @@
 // testID, the flow breaks on a simulator ten minutes later. This catches it in
 // seconds, before any build is spent.
 //
-// Usage: node scripts/factory/check-testids.mjs [flowsDir] [sourceDir]
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+// Usage: node scripts/factory/check-testids.mjs [flowsDir] [sourceDir...]
+//   With no source folder given, it reads every app code folder that exists: src/, and the
+//   root-level app/, components/, lib/, features/ and hooks/ that Expo Router projects also use.
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -61,21 +63,27 @@ export function findMissing(flows, sources) {
   return missing;
 }
 
+export const DEFAULT_SOURCE_DIRS = ['src', 'app', 'components', 'lib', 'features', 'hooks'];
+
 function main() {
   const flowsDir = process.argv[2] ?? '.maestro';
-  const sourceDir = process.argv[3] ?? 'src';
+  const sourceDirs = process.argv.length > 3 ? process.argv.slice(3) : DEFAULT_SOURCE_DIRS.filter((dir) => existsSync(dir));
+  if (sourceDirs.length === 0) {
+    console.error(`No app code folder found. Looked for ${DEFAULT_SOURCE_DIRS.join(', ')}; pass the folder to check.`);
+    process.exit(1);
+  }
 
   const flows = walk(flowsDir, (name) => /\.ya?ml$/.test(name)).map((path) => [
     relative('.', path),
     readFileSync(path, 'utf8'),
   ]);
-  const sources = walk(sourceDir, (name) => /\.(tsx?|jsx?)$/.test(name) && !/\.test\./.test(name)).map(
-    (path) => readFileSync(path, 'utf8')
-  );
+  const isSource = (name) => /\.(tsx?|jsx?)$/.test(name) && !/\.test\./.test(name);
+  const sources = sourceDirs.flatMap((dir) => walk(dir, isSource)).map((path) => readFileSync(path, 'utf8'));
 
   const missing = findMissing(flows, sources);
   if (missing.length === 0) {
-    console.log(`testIDs OK: every id used in ${flows.length} Maestro flow(s) exists in ${sourceDir}/.`);
+    const where = sourceDirs.map((dir) => `${dir}/`).join(', ');
+    console.log(`testIDs OK: every id used in ${flows.length} Maestro flow(s) exists in ${where}.`);
     return;
   }
 

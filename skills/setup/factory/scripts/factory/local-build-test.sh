@@ -11,7 +11,7 @@ UDID=${1:?Usage: bash scripts/factory/local-build-test.sh <simulator UDID>}
 cd "$(git rev-parse --show-toplevel)"
 OUT=agent-output
 mkdir -p "$OUT"
-BUNDLE_ID=$(node -p "require('./app.json').expo.ios.bundleIdentifier")
+BUNDLE_ID=$(node scripts/factory/app-id.mjs)
 
 # The build rewrites the ios and android scripts in package.json. Restore the file from a copy,
 # not from git: git checkout would also throw away a change the issue made to package.json.

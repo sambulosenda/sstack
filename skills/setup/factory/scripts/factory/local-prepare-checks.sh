@@ -24,7 +24,7 @@ TEMPLATES=scripts/factory/briefs
 [ -f "$OUT/summary.md" ] || { echo "No $OUT/summary.md: write the summary first" >&2; exit 1; }
 [ -f "$OUT/app-path.txt" ] || { echo "No $OUT/app-path.txt: run local-build-test.sh first" >&2; exit 1; }
 APP=$(cat "$OUT/app-path.txt")
-BUNDLE_ID=$(node -p "require('./app.json').expo.ios.bundleIdentifier")
+BUNDLE_ID=$(node scripts/factory/app-id.mjs)
 
 # A fresh install, as the cloud pipeline tests: the Maestro flows leave the app past onboarding.
 xcrun simctl uninstall "$UDID" "$BUNDLE_ID" || true
@@ -49,7 +49,7 @@ else
 fi
 
 ROOT="$ROOT" ISSUE="$ISSUE" UDID="$UDID" BUNDLE_ID="$BUNDLE_ID" APP="$APP" KIND="$KIND" \
-  CHANGED="$(git diff --name-only "$BASE")" ISSUES="$(git ls-files docs/issues)" SOURCES="$(git ls-files src)" \
+  CHANGED="$(git diff --name-only "$BASE")" ISSUES="$(git ls-files -- "$(dirname "$ISSUE")")" SOURCES="$(git ls-files -- src app components lib features hooks)" \
   TEMPLATES="$TEMPLATES" OUT="$OUT" node -e '
     const fs = require("fs");
     const env = process.env;
