@@ -76,3 +76,19 @@ test('a URL in a string is not taken for a comment', () => {
   const source = `const help = 'https://example.com/help'; <View testID="home-help" />`;
   assert.deepEqual([...sourceIds(source)], ['home-help']);
 });
+
+test('finds testIDs in root-level app/ and components/ when there is no src/', async () => {
+  const { execFileSync } = await import('node:child_process');
+  const { mkdtempSync, mkdirSync, writeFileSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const { join } = await import('node:path');
+  const { fileURLToPath } = await import('node:url');
+  const script = fileURLToPath(new URL('./check-testids.mjs', import.meta.url));
+  const dir = mkdtempSync(join(tmpdir(), 'testids-'));
+  for (const folder of ['.maestro', 'app', 'components']) mkdirSync(join(dir, folder));
+  writeFileSync(join(dir, '.maestro', 'home.yaml'), '- assertVisible:\n    id: "home-screen"\n- tapOn:\n    id: "home-send"\n');
+  writeFileSync(join(dir, 'app', 'index.tsx'), '<View testID="home-screen" />');
+  writeFileSync(join(dir, 'components', 'send.tsx'), '<Pressable testID="home-send" />');
+  const output = execFileSync('node', [script], { cwd: dir, encoding: 'utf8' });
+  assert.match(output, /exists in app\/, components\//);
+});

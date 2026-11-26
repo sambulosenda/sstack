@@ -56,3 +56,31 @@ test('rewording existing copy is a minor fix, not new behaviour', () => {
   const patch = "-    start: 'Begin',\n+    start: 'Start',";
   assert.equal(classifyFix([file('src/lib/strings.ts', patch)]).level, 'single');
 });
+
+// A trial on an Expo app without src/ (Expo Router at the root, Supabase beside it) found every
+// fix rated "0 changed lines of app code", including two that changed the database.
+test('app code outside src/ counts: lib/, components/ and app/ at the root', () => {
+  const { level, reasons } = classifyFix([file('lib/groups.ts', lines(10)), file('components/GroupMessages.tsx', lines(5))]);
+  assert.equal(level, 'single');
+  assert.match(reasons[0], /15 changed lines of app code/);
+});
+
+test('a new migration is new behaviour', () => {
+  const { level, reasons } = classifyFix([file('supabase/migrations/20260907130100_recheck.sql', '+create or replace function public.claim_outbox() ...', 'added')]);
+  assert.equal(level, 'full');
+  assert.match(reasons.join('\n'), /new app file supabase\/migrations/);
+});
+
+test('database tests and test folders are tests, not app code', () => {
+  const { level } = classifyFix([
+    file('supabase/tests/database/32-quiet-hours.sql', lines(200), 'added'),
+    file('tests/integration/quiet-hours.test.ts', lines(200)),
+    file('lib/groups.ts', '-  a\n+  b'),
+  ]);
+  assert.equal(level, 'single');
+});
+
+test("the factory's own files are not app code", () => {
+  const { level } = classifyFix([file('scripts/factory/local-run.mjs', lines(100), 'added'), file('lib/groups.ts', '-  a\n+  b')]);
+  assert.equal(level, 'single');
+});

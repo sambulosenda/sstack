@@ -14,13 +14,15 @@
 //
 // Usage (in CI): PR_NUMBER=12 BRANCH=agent/issue-7 GITHUB_TOKEN=... GITHUB_REPOSITORY=o/r \
 //   node scripts/factory/check-guardrails.mjs
-// Usage (local run, no GitHub): node scripts/factory/check-guardrails.mjs --local main
+// Usage (local run, no GitHub): node scripts/factory/check-guardrails.mjs --local [<base>]
+//   Without a base it compares with the branch the run started from (scripts/factory/local-run.mjs).
 //   Checks everything that differs from the base branch: commits, staged and unstaged
 //   changes, and new files.
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { newFiles, runBase } from './local-run.mjs';
 
 export const OVERRIDE_LABEL = 'allow-test-changes';
 
@@ -124,8 +126,9 @@ export function localFiles(base, cwd = process.cwd()) {
       patch: git('diff', '--no-renames', base, '--', filename),
     };
   });
-  // git diff does not list files that were never added.
-  for (const filename of lines(git('ls-files', '--others', '--exclude-standard'))) {
+  // git diff does not list files that were never added. Untracked files that were there before
+  // the run started are the person's, not the change's (scripts/factory/local-run.mjs).
+  for (const filename of newFiles(cwd)) {
     const added = readFileSync(join(cwd, filename), 'utf8').split('\n').map((line) => `+${line}`);
     files.push({ filename, status: 'added', patch: added.join('\n') });
   }
@@ -160,7 +163,7 @@ async function github(path) {
 async function main() {
   const localFlag = process.argv.indexOf('--local');
   if (localFlag !== -1) {
-    const files = localFiles(process.argv[localFlag + 1] ?? 'main');
+    const files = localFiles(process.argv[localFlag + 1] ?? runBase());
     report(findViolations(files), files.length, 'If the issue really does remove this behaviour, ask the person who started the run.');
     return;
   }

@@ -13,7 +13,7 @@ Read and follow these files:
 This section replaces the one check-pr.md mentions. Where check-pr.md says to run the shell command of the Device section, use the device tools of this session instead.
 
 - iOS simulator UDID {{UDID}}, already booted. App bundle ID {{BUNDLE_ID}}. You are the only one driving this simulator.
-- The app is freshly installed and open, on onboarding.
+- The app is freshly installed and open, on its first screen. The app facts say what that is and what a session needs first (an account, a running backend).
 - Use the argent MCP tools (mcp__argent__describe, gesture-tap, gesture-swipe, screenshot, await-ui-element, native-find-views, native-full-hierarchy, launch-app, restart-app, reinstall-app, screen-recording-start and -stop). Load their schemas with ToolSearch if they are not loaded. Do not use the Maestro MCP tools: twice they coincided with the app being driven by something other than the tester.
 - Take tap coordinates from the element tree, never from screenshot pixels. Frames are fractions of the screen; read the screen size in points once with native-full-hierarchy.
 - `describe` may list only text at first. Then find a control by its testID with native-find-views. After the app has restarted, `describe` usually lists buttons with their testIDs and a [selected] state.

@@ -1,6 +1,6 @@
 {
   "name": "sstack",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "A software factory for Expo apps: agents turn issues into tested changes, checked by scripts, Maestro flows, a QA agent on a simulator and a fresh code reviewer, with a person deciding every merge and release.",
   "author": {
     "name": "sambulosenda",

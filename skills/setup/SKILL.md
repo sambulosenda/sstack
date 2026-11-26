@@ -20,18 +20,23 @@ Ask before you overwrite anything. Make no commit until the person has seen the 
 
 ## 1. Copy
 
-Copy everything in `factory/` into the project root, keeping its paths: `.eas/`, `.github/`, `scripts/factory/`, `types/expo.d.ts`, `jest/style-stub.js`, `AGENTS.md`.
+First ask which half the person wants:
+
+- **Local runner only** (`factory-run` on this Mac): `scripts/factory/` except `maestro-report.test.mjs`, which tests a cloud script, the prompts in `.eas/agents/*.md`, and `AGENTS.md`. No workflows. Pick this when there is no paid Expo plan yet, or when the app's checks need services a cloud job would not have.
+- **Local runner and cloud pipeline**: everything below.
+
+Copy everything in `factory/` that the chosen half needs into the project root, keeping its paths: `.eas/`, `.github/`, `scripts/factory/`, `types/expo.d.ts`, `jest/style-stub.js`, `AGENTS.md`.
 
 - If a file already exists, do not overwrite it. List each clash, show the difference, and ask whether to merge, keep theirs, or take ours.
 - If the project already has an `AGENTS.md` or `CLAUDE.md`, merge: keep their rules, add the factory's sections, and ask about any rule that contradicts one of theirs.
 - Make the `.sh` files executable.
 - The retry job in `.eas/workflows/pr.yml` installs with `npm ci --ignore-scripts`, and `.github/workflows/agent-label.yml` with `npm ci`. If the app uses Yarn, pnpm or Bun, change them to its install command, still without install scripts in the retry job.
 - The static job runs the pull request's code in the `development` environment. Tell the person to keep that environment free of secrets.
-- `.eas/agents/start-session.sh` reads the bundle ID from `app.json`. If the app uses `app.config.js` instead, ask how to get the ID without running the config in a job that holds tokens.
+- The local runner reads the bundle ID with `scripts/factory/app-id.mjs`, from `app.json` or, for `app.config.ts` and `app.config.js`, from Expo's resolved config. The cloud's `.eas/agents/start-session.sh` reads only `app.json`, because it must not run project code beside tokens: for an app with `app.config.*`, ask how the cloud should get the ID.
 
 ## 2. Make it true for this app
 
-Read the app before you write about it: its routes, its screens, its `src/` layout, `package.json`, `app.json`.
+Read the app before you write about it: its README, its routes and screens, its folders (`src/`, or `app/`, `components/` and `lib/` at the root), `package.json`, and `app.json` or `app.config.*`. If it already has an agent workflow, such as specs and tickets from mattpocock/skills, keep it: its tickets work as `factory-run`'s issues.
 
 1. **Bundle ID.** In `.eas/workflows/pr.yml`, set `MAESTRO_APP_ID` to the app's iOS bundle identifier. A new Expo app has none, and older ones may have a placeholder such as `com.yourcompany.yourapp`: then ask the person for the real one, and set `ios.bundleIdentifier` and `android.package` in `app.json` too.
 2. **AGENTS.md.**
@@ -48,17 +53,22 @@ Read the app before you write about it: its routes, its screens, its `src/` layo
   - `"typecheck": "tsc --noEmit"` (TypeScript projects)
   - `"check:testids": "node scripts/factory/check-testids.mjs"`
   - `"test:factory": "node --test \"scripts/factory/*.test.mjs\""`
-  - `"verify"`: the project's typecheck, `expo lint`, `check:testids`, and its Jest run with `--ci`, chained with `&&`.
+  - `"verify"`: the project's typecheck, its lint if it has one, `check:testids`, and its test run, chained with `&&`.
+- **Commands.** List exactly those checks under Commands in `AGENTS.md`: the coding and fix agents run what that list says. For the cloud pipeline, the coding agent may run only the commands in its allowlist in `.eas/agents/run-agent.sh` (the `change` mode): make that list match, and keep each command exact.
+- **Services.** If the tests or the Maestro flows need something running, such as a local Supabase stack, write that in `AGENTS.md` and the app facts, with the command that starts it.
+- **Generated files.** Look for scripts that write a committed file from the code or the database (`types:gen`, `functions:gen`, `codegen`, `db:types`) and for CI steps that fail when one is stale (`git diff --exit-code` after a generator). List each in `AGENTS.md` beside Commands: "After a <kind> change, run `<script>` and commit `<file>`." A trial missed a function snapshot that CI checks, and the first change failed review for it.
+- **How the flows find things.** If the app has no testIDs and its flows find elements by visible text and accessibility labels, say so in `AGENTS.md`: the change and review prompts follow what it says.
 - **.gitignore.** Add `agent-output/`, `.argent/` and `*.profraw`.
 - **ESLint.** A new Expo app has no ESLint config until `npx expo lint` first runs, which creates it. Then add a block with `linterOptions: { noInlineConfig: true }`, so no comment can switch a rule off. `scripts/factory/check-guardrails.mjs` already fails an agent pull request that edits an ESLint config.
 - **TypeScript.** `types/expo.d.ts` declares Expo's types, so the typecheck passes in CI, where the gitignored `expo-env.d.ts` does not exist. Add `"types": ["jest"]` to `compilerOptions` in `tsconfig.json` once Jest is in.
-- **Jest.** The factory's agents write tests and the pipeline runs them, so the app needs Jest. If it has none, ask, then install with `npx expo install jest-expo jest @types/jest @react-native/jest-preset @testing-library/react-native -- --save-dev`. In the Jest config:
+- **Tests.** If the app already has a test runner, such as Vitest, keep it and do not add Jest. Check that it does not pick up the factory's own `scripts/factory/*.test.mjs`, which run under `node --test`. The rest of this item is for an app with no tests at all.
+- **Jest.** The factory's agents write tests and the pipeline runs them, so the app needs a test runner. If it has none, ask, then install with `npx expo install jest-expo jest @types/jest @react-native/jest-preset @testing-library/react-native -- --save-dev`. In the Jest config:
   - `"preset": "jest-expo"` and `"clearMocks": true`, so a stub in one test cannot leak into the next.
   - `"testPathIgnorePatterns": ["/node_modules/", "/.eas/", "/scripts/"]`. Without it Jest picks up the factory's own `*.test.mjs` files, which run under `node --test`, and fails. Add this even when the app already had Jest.
   - `"moduleNameMapper"`: `"\\.css$": "<rootDir>/jest/style-stub.js"` when the app imports CSS, and `"^@/assets/(.*)$": "<rootDir>/assets/$1"` when `tsconfig.json` maps `@/assets/*` outside `src/`.
   - If the app uses `react-native-reanimated`: `"resolver": "react-native-reanimated/jest/resolver"`, and a `setupFilesAfterEnv` file that calls `require('react-native-reanimated').setUpTests()`.
   - If the app has no test yet, add one that renders the first screen and finds its root testID, so the Jest run has something to pass. Put it outside `src/app/`: Expo Router treats every file there as a route.
-- **Maestro.** The factory needs at least one flow in `.maestro/` that launches the app and asserts the first screen's root testID. If there is none, write it, and add the testID to the screen if it is missing.
+- **Maestro.** The factory needs at least one flow that launches the app and asserts the first screen's root testID. If there is none, write it, and add the testID to the screen if it is missing. If the app's existing flows need inputs prepared by hand (an invitation token, a signed-in account), put the factory's own self-contained flows in `.maestro/factory/`: the build script then runs only those.
 
 ## 4. Optional: the style rules
 
@@ -71,6 +81,10 @@ Ask whether to install them. If yes: add the rules to the project's ESLint confi
 Run `npm run test:factory`, then `npm run verify`. Fix what the factory files cause. Report, and do not fix, failures that were there before. To tell them apart, check whether the failing file is one you added or changed.
 
 A new Expo SDK 58 app fails its own typecheck in `src/components/app-tabs.web.tsx` and its own lint in `src/hooks/use-color-scheme.web.ts`. Those are template issues: report them, and say each needs a one-line fix before the pipeline's checks can pass.
+
+Then build and run the factory's own flow once, before any issue: `bash scripts/factory/local-build-test.sh <UDID>`. It shows what an issue run would hit, so the person can fix it first:
+- **Exit 3:** the app exits as it opens. The script prints the crash. For example, Expo SDK 57 or older built with Xcode 27 fails with "UIScene life cycle is required". Moving the app to an SDK that supports that Xcode, or building with an older Xcode, is the person's decision. Until then QA cannot run: write that in the app facts.
+- **Every flow fails:** look at the simulator for a system prompt, such as "Open in <app>?", and tap through it once.
 
 ## 6. Report
 

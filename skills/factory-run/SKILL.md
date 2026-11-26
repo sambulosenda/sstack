@@ -7,15 +7,15 @@ description: Run one issue through the factory on this machine instead of on Exp
 
 The same stations as the cloud pipeline, with the same prompts and scripts, run by you on this Mac. One issue at a time: the simulator is shared.
 
-The input is an issue file, `docs/issues/<nn>-<slug>.md`, in the shape that `prd-to-issues` writes. The output is a branch `agent/issue-<nn>` with one commit, and a report. You do not merge, push or open a pull request.
+The input is an issue file with a description and checkable acceptance criteria: `docs/issues/<nn>-<slug>.md` in the shape that `prd-to-issues` writes, or a ticket such as `.scratch/<feature>/issues/<nn>-<slug>.md` from mattpocock/skills' `to-tickets`, whose `- [ ]` items are its acceptance criteria. The output is a branch `agent/issue-<nn>`, made from the branch you started on (the base), with one commit for the change and one for each fix after review, and a report. You do not merge, push or open a pull request.
 
 Work through the stations in order. Do not skip one because the change looks small.
 
 ## 0. Preflight
 
 - `scripts/factory/local-build-test.sh` exists. If not, the factory is not installed in this project: run the `setup` skill first.
-- `git status --porcelain` is empty and the branch is `main`. If not, stop and say what is in the way.
-- `node_modules` exists. If not, `npm ci`.
+- No tracked file is changed: `git status --porcelain --untracked-files=no` prints nothing. If it does, stop and say what is in the way. The branch you are on is the base; it need not be `main`. Untracked files may stay: they are the person's, not the change's. Never add, commit, move or delete them, and stage only the change's files, by name.- `node_modules` exists. If not, install with the project's package manager and its lockfile: `npm ci`, `bun install --frozen-lockfile`, `yarn install --frozen-lockfile` or `pnpm install --frozen-lockfile`.
+- If the app's tests or flows need a service, such as a local database, AGENTS.md says so: check it is running before station 3.
 - Read the issue file. If `For:` says `human`, stop: it is not an agent issue.
 
 ## 1. Triage
@@ -23,25 +23,27 @@ Work through the stations in order. Do not skip one because the change looks sma
 Read `.eas/agents/triage.md` and apply it to the issue. You are in a conversation, so instead of writing a verdict file:
 
 - BUILD: say so in one line and go on.
-- ASK: put the questions to the person in chat, with your recommended answer for each, and wait. Then add the answers to the issue file under `### Decisions` and commit that to `main` with the message `Record decisions for issue <nn>`, so the issue stays the source of truth.
+- ASK: put the questions to the person in chat, with your recommended answer for each, and wait. Then add the answers to the issue file under `### Decisions` and commit that to the base with the message `Record decisions for issue <nn>`, so the issue stays the source of truth.
 
 ## 2. Change
 
-1. `git switch -c agent/issue-<nn>`. If the branch exists, stop and ask whether to delete it.
+1. `node scripts/factory/local-run.mjs start`, then `git switch -c agent/issue-<nn>`. If the branch exists, stop and ask whether to delete it. `start` records the base commit and the untracked files already here, each with its hash. Then the guardrails, the review diff and fix-scope compare with that commit and leave those files out, unless one of them changes during the run.
 2. Follow `.eas/agents/make-change.md` from step 1 to step 8, with the issue file as the issue. Its rules hold here too: nothing in `.eas`, `.github` or `scripts/factory`, no new dependency, nothing on the "Never touch" list.
 3. The summary goes to `agent-output/summary.md` (ignored by git).
 
-If the outcome is "No change", switch back to `main`, delete the branch, and report the reason. That is a good result.
+If the outcome is "No change", switch back to the base, delete the branch, and report the reason. That is a good result.
 
 ## 3. Scripted checks
 
 Run each. All must pass.
 
 ```sh
-node scripts/factory/check-guardrails.mjs --local main
-npm run verify
+node scripts/factory/check-guardrails.mjs --local   # compares with the base
+npm run verify        # or the project's equivalent: the checks AGENTS.md lists under Commands
 git status --porcelain -- .eas .github scripts/factory   # must print nothing
 ```
+
+If AGENTS.md lists files generated from the code, such as database types or a snapshot of the database's functions, the change must regenerate and commit them: CI fails on a stale one.
 
 ## 4. Build and end-to-end flows
 
@@ -51,7 +53,7 @@ Pick the simulator: one that is already booted, otherwise boot one. Note its UDI
 bash scripts/factory/local-build-test.sh <UDID>
 ```
 
-It builds a Release app, which carries its own JavaScript and needs no Metro, installs it, and runs every flow in `.maestro/`. It handles what used to need a hand fix: it sets the locale CocoaPods needs, restores `package.json` after the build rewrites it, keeps the issue's own change to that file, records the app's path for QA, and runs the flows once more only if Maestro itself crashed without failing a flow. Exit 1 is a native build failure, which is not yours to fix: stop and report it. Exit 2 is a failed flow: go to station 5.
+It builds a Release app, which carries its own JavaScript and needs no Metro, installs it, and runs every flow in `.maestro/`. It handles what used to need a hand fix: it sets the locale CocoaPods needs, restores `package.json` after the build rewrites it, keeps the issue's own change to that file, records the app's path for QA, and runs the flows once more only if Maestro itself crashed without failing a flow. It sets `SENTRY_DISABLE_AUTO_UPLOAD=true` for the build, so a project with Sentry builds without its token. Exit 1 is a native build failure, which is not yours to fix: stop and report it. Exit 3 means the app exits as it opens: the script prints the crash from the simulator's log. Run the script on the base branch. If the app crashes there too, the change did not cause it: report it, skip station 5, and mark the flows and QA as not run for that reason. Exit 2 is a failed flow: go to station 5. When every flow fails at once, look at the simulator first: a system prompt such as "Open in <app>?" covers the app the first time a new URL scheme opens it.
 
 ## 5. Retry
 
@@ -65,7 +67,7 @@ Get both ready with one command:
 bash scripts/factory/local-prepare-checks.sh <issue file> <UDID>
 ```
 
-It reinstalls the app so QA starts on onboarding like a new user, clears old evidence, writes the review folder `agent-output/review/`, and writes two briefs: `agent-output/qa-brief.md` and `agent-output/review-brief.md`. They come from the templates in `scripts/factory/briefs/`. When something a tester needed was missing, fix the template, not the brief, so the next run has it too.
+It reinstalls the app so QA starts on its first screen like a new user, clears old evidence, writes the review folder `agent-output/review/`, and writes two briefs: `agent-output/qa-brief.md` and `agent-output/review-brief.md`. They come from the templates in `scripts/factory/briefs/`. When something a tester needed was missing, fix the template, not the brief, so the next run has it too.
 
 Record what the project looks like now, so you can tell afterwards whether a checker changed it:
 
@@ -106,17 +108,17 @@ Report what the re-check found. A fix that skips its re-check is code that nobod
 
 ## 8. Finish
 
-1. Commit everything on the branch in one commit. The message is line 1 of the summary, then the rest of the summary. If there were fix attempts, they are part of the same commit.
+1. Commit the change's files on the branch, by name. Station 5's fix attempts are part of the change's commit. Each fix after QA and review is a commit of its own (7b), so fix-scope can compare with the commit the checkers saw. The message is line 1 of the summary, then the rest; a fix's message names the findings it addresses.
 2. Stay on the branch, so the person can run the app as it is.
 3. Report, short:
    - the title and the branch,
-   - risk: the output of `node scripts/factory/risk.mjs $(git diff --name-only main)`,
+   - risk: the output of `node scripts/factory/risk.mjs $(git diff --name-only "$(node scripts/factory/local-run.mjs base)")`,
    - each station: passed, failed, or not run, and why,
    - the QA verdict line and where the screenshots are,
    - the review verdict line and each "must fix" finding,
    - for each fix after QA and review, the level fix-scope printed and what the re-check found,
    - fix attempts used,
-   - how to accept it (`git switch main && git merge agent/issue-<nn>`) or drop it (`git switch main && git branch -D agent/issue-<nn>`).
+   - how to accept it (`git switch <base> && git merge agent/issue-<nn>`) or drop it (`git switch <base> && git branch -D agent/issue-<nn>`), where `<base>` is what `node scripts/factory/local-run.mjs base-name` prints.
 
 ## When the run teaches you something
 

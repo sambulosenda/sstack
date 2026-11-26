@@ -14,6 +14,7 @@ import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { newFiles } from './local-run.mjs';
 
 /** Above this many changed lines of app code (not tests, not comments), a fix counts as large. */
 export const LargeFixLines = 80;
@@ -25,8 +26,14 @@ export const Levels = {
 };
 
 const isDoc = (name) => name.endsWith('.md') || name.startsWith('docs/');
-const isTest = (name) => /\.test\.[cm]?[jt]sx?$/.test(name);
-const isAppSource = (name) => name.startsWith('src/') && /\.[cm]?[jt]sx?$/.test(name) && !isTest(name);
+// A test file, or anything in a tests folder: supabase/tests/database/*.sql is a test too.
+const isTest = (name) => /\.test\.[cm]?[jt]sx?$/.test(name) || /(^|\/)(tests?|__tests__)\//.test(name);
+// The factory's own files and the pipeline's are not the app.
+const isFactory = (name) => /^(scripts\/factory|\.eas|\.github|\.maestro)\//.test(name);
+// App code wherever the project keeps it (src/, or app/, components/, lib/ at the root, or a
+// supabase/ folder), and SQL too: a migration is behaviour. A trial on an app without src/ found
+// every fix rated "0 changed lines of app code" when it had changed the database twice.
+const isAppSource = (name) => /\.([cm]?[jt]sx?|sql)$/.test(name) && !isTest(name) && !isFactory(name) && !name.startsWith('node_modules/');
 const isComment = (line) => /^(\/\/|\/\*|\*|\{\/\*)/.test(line.trim());
 const isConfig = (name) => /^(package\.json|app\.json|app\.config\.[cm]?[jt]s|eas\.json)$/.test(name);
 
@@ -92,7 +99,8 @@ export function filesBetween(base, head, cwd = process.cwd()) {
       return { filename, status: statuses[code] ?? 'modified', patch: git('diff', '--no-renames', ...range, '--', filename) };
     });
   if (!head) {
-    for (const filename of git('ls-files', '--others', '--exclude-standard').split('\n').filter(Boolean)) {
+    // Untracked files that were there before the run started are the person's (local-run.mjs).
+    for (const filename of newFiles(cwd)) {
       const patch = readFileSync(join(cwd, filename), 'utf8').split('\n').map((line) => `+${line}`).join('\n');
       files.push({ filename, status: 'added', patch });
     }
