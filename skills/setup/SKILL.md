@@ -56,6 +56,8 @@ Read the app before you write about it: its README, its routes and screens, its 
   - `"verify"`: the project's typecheck, its lint if it has one, `check:testids`, and its test run, chained with `&&`.
 - **Commands.** List exactly those checks under Commands in `AGENTS.md`: the coding and fix agents run what that list says. For the cloud pipeline, the coding agent may run only the commands in its allowlist in `.eas/agents/run-agent.sh` (the `change` mode): make that list match, and keep each command exact.
 - **Services.** If the tests or the Maestro flows need something running, such as a local Supabase stack, write that in `AGENTS.md` and the app facts, with the command that starts it.
+- **Generated files.** Look for scripts that write a committed file from the code or the database (`types:gen`, `functions:gen`, `codegen`, `db:types`) and for CI steps that fail when one is stale (`git diff --exit-code` after a generator). List each in `AGENTS.md` beside Commands: "After a <kind> change, run `<script>` and commit `<file>`." A trial missed a function snapshot that CI checks, and the first change failed review for it.
+- **How the flows find things.** If the app has no testIDs and its flows find elements by visible text and accessibility labels, say so in `AGENTS.md`: the change and review prompts follow what it says.
 - **.gitignore.** Add `agent-output/`, `.argent/` and `*.profraw`.
 - **ESLint.** A new Expo app has no ESLint config until `npx expo lint` first runs, which creates it. Then add a block with `linterOptions: { noInlineConfig: true }`, so no comment can switch a rule off. `scripts/factory/check-guardrails.mjs` already fails an agent pull request that edits an ESLint config.
 - **TypeScript.** `types/expo.d.ts` declares Expo's types, so the typecheck passes in CI, where the gitignored `expo-env.d.ts` does not exist. Add `"types": ["jest"]` to `compilerOptions` in `tsconfig.json` once Jest is in.
@@ -79,6 +81,10 @@ Ask whether to install them. If yes: add the rules to the project's ESLint confi
 Run `npm run test:factory`, then `npm run verify`. Fix what the factory files cause. Report, and do not fix, failures that were there before. To tell them apart, check whether the failing file is one you added or changed.
 
 A new Expo SDK 58 app fails its own typecheck in `src/components/app-tabs.web.tsx` and its own lint in `src/hooks/use-color-scheme.web.ts`. Those are template issues: report them, and say each needs a one-line fix before the pipeline's checks can pass.
+
+Then build and run the factory's own flow once, before any issue: `bash scripts/factory/local-build-test.sh <UDID>`. It shows what an issue run would hit, so the person can fix it first:
+- **Exit 3:** the app exits as it opens. The script prints the crash. For example, Expo SDK 57 or older built with Xcode 27 fails with "UIScene life cycle is required". Moving the app to an SDK that supports that Xcode, or building with an older Xcode, is the person's decision. Until then QA cannot run: write that in the app facts.
+- **Every flow fails:** look at the simulator for a system prompt, such as "Open in <app>?", and tap through it once.
 
 ## 6. Report
 

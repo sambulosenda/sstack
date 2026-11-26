@@ -35,9 +35,10 @@ xcrun simctl launch "$UDID" "$BUNDLE_ID" > /dev/null
 rm -rf "$OUT/evidence" "$OUT/review"
 mkdir -p "$OUT/evidence" "$OUT/review"
 
-# New files must be in the diff: mark them as intended, without staging their content.
-git ls-files --others --exclude-standard -z | xargs -0 git add -N --
-BASE=${FIX_BASE:-main}
+# New files must be in the diff: mark them as intended, without staging their content. Only the
+# change's: untracked files that were there before the run are the person's (local-run.mjs).
+node scripts/factory/local-run.mjs new-files | while IFS= read -r file; do git add -N -- "$file"; done
+BASE=${FIX_BASE:-$(node scripts/factory/local-run.mjs base)}
 git diff "$BASE" > "$OUT/review/pr.diff"
 cp "$ISSUE" "$OUT/review/issue.md"
 cp "$OUT/summary.md" "$OUT/review/summary.md"
@@ -49,7 +50,8 @@ else
 fi
 
 ROOT="$ROOT" ISSUE="$ISSUE" UDID="$UDID" BUNDLE_ID="$BUNDLE_ID" APP="$APP" KIND="$KIND" \
-  CHANGED="$(git diff --name-only "$BASE")" ISSUES="$(git ls-files -- "$(dirname "$ISSUE")")" SOURCES="$(git ls-files -- src app components lib features hooks)" \
+  CHANGED="$(git diff --name-only "$BASE")" ISSUE_DIR="$(dirname "$ISSUE")" ISSUES="$(git ls-files -- "$(dirname "$ISSUE")")" \
+  SOURCES="$(git ls-files -- '*.ts' '*.tsx' '*.js' '*.jsx' '*.mjs' '*.sql' ':!:scripts/factory/' ':!:.eas/' ':!:.github/' ':!:.maestro/' ':!:*.test.*' ':!:tests/' ':!:**/tests/**' ':!:*.d.ts')" \
   TEMPLATES="$TEMPLATES" OUT="$OUT" node -e '
     const fs = require("fs");
     const env = process.env;
@@ -63,6 +65,7 @@ ROOT="$ROOT" ISSUE="$ISSUE" UDID="$UDID" BUNDLE_ID="$BUNDLE_ID" APP="$APP" KIND=
       REVIEW_KIND: env.KIND,
       CHANGED_FILES: list(env.CHANGED),
       // Six reviewers in a row ran ls, against their rules, to find these.
+      ISSUE_DIR: env.ISSUE_DIR,
       ISSUE_FILES: list(env.ISSUES),
       SOURCE_FILES: list(env.SOURCES),
     };

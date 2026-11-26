@@ -10,11 +10,11 @@ You may have no search tools, so here are the files the diff touches:
 
 {{CHANGED_FILES}}
 
-Read AGENTS.md and docs/PRD.md for context, and open whatever the changed files import. The later issues in docs/issues/ show what will build on this change. You do not need to list folders; these are the issues:
+Read AGENTS.md for context, and the spec, glossary or product document it points to. Open whatever the changed files import. When a changed file redefines something an earlier file defined, such as a function in a new migration, open the earlier definition too. The other issues in {{ISSUE_DIR}} show what will build on this change. You do not need to list folders; these are the issues:
 
 {{ISSUE_FILES}}
 
-and these are the app's source files, with the change applied:
+and these are the app's source files, with the change applied (code and SQL; tests are left out):
 
 {{SOURCE_FILES}}
 
